@@ -16,6 +16,8 @@ export const EmailLogController = {
 
     const query: any = {};
 
+    if(page) query.page = Number(page);
+    if(limit) query.limit = Number(limit);
     if (user) query.user = user;
     if (type) query.type = type;
     if (status) query.status = status;
@@ -25,7 +27,7 @@ export const EmailLogController = {
       if (to) query.createdAt.$lte = new Date(to);
     }
 
-   const response = await paginate(EmailLog, query, +page, +limit)
+   const response = await paginate(EmailLog, query)
 
     res.json({
       status: true,

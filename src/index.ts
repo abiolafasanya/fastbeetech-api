@@ -22,8 +22,8 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 app.use(express.static(path.join(__dirname, "../public")));
 // Allow larger payloads
-app.use(bodyParser.json({ limit: "100mb" }));
-app.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
+// app.use(bodyParser.json({ limit: "100mb" }));
+// app.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 app.use(cookieParser()); // 👈 REQUIRED before your authenticate middleware
 
 app.use(
@@ -34,7 +34,7 @@ app.use(
 );
 
 app.use(express.json());
-app.use(express.urlencoded());
+app.use(express.urlencoded({ extended: true }));
 
 // Set security HTTP headers
 app.use(helmet());

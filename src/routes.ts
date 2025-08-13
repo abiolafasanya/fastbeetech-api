@@ -2,6 +2,8 @@ import { Router } from "express";
 import InternsRoute from "./module/internship/route";
 import EmailLogRoute from "./module/emails/route";
 import { authenticate } from "./common/middleware/auth";
+import BlogRoute from "./module/blog/route"
+import AnalyticsRoute from "./module/analytics/route"
 import {
   uploadImageHandler,
   uploadMultipleImagesHandler,
@@ -18,4 +20,6 @@ export default function (router: Router) {
   AuthRoute(router);
   InternsRoute(router);
   EmailLogRoute(router);
+  BlogRoute(router)
+  AnalyticsRoute(router)
 }

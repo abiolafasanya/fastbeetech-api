@@ -8,6 +8,7 @@ import {
   UnauthorizedException,
 } from "../../common/middleware/errors";
 import { sendEmail } from "../../common/utils/sendEmail";
+import { signAuthToken } from "../../common/utils/authToken";
 
 class AuthController {
   register = async (req: Request, res: Response) => {
@@ -19,21 +20,22 @@ class AuthController {
     if (existingUser)
       return res.status(400).json({ message: "Email already in use" });
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // Prevent privilege escalation (allow only specific roles at signup)
+    const allowedSignupRoles = new Set(["user", "agent"]); // expand if desired
+    const safeRole = allowedSignupRoles.has(role) ? role : "user";
 
     const user = await User.create({
       name,
       email,
-      password: hashedPassword,
-      role: role || "user",
+      password, // will be hashed by pre('save')
+      role: safeRole,
+      permissions: [], // default empty; assign later via admin if needed
     });
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: "7d" }
-    );
+    // JWT
+    const token = signAuthToken(user);
 
+    // Email verification
     const verificationToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto
       .createHash("sha256")
@@ -44,7 +46,9 @@ class AuthController {
     user.emailVerificationExpires = Date.now() + 1000 * 60 * 60 * 24; // 24 hours
     await user.save();
 
-    const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}&email=${email}`;
+    const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}&email=${encodeURIComponent(
+      email
+    )}`;
 
     await sendEmail({
       to: user.email,
@@ -55,13 +59,13 @@ class AuthController {
       },
     });
 
-    // ✅ Set token in cookie
+    // Cookie
     res.cookie("token", token, {
-      httpOnly: true, // Prevent access from client-side JS
-      secure: process.env.NODE_ENV === "production", // Use HTTPS in production
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({
@@ -73,7 +77,9 @@ class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
+          permissions: user.permissions,
           avatar: user.avatar,
+          isEmailVerified: user.isEmailVerified,
         },
       },
     });
@@ -81,7 +87,6 @@ class AuthController {
 
   verifyEmail = async (req: Request, res: Response) => {
     const { token, email } = req.query;
-
     if (!token || !email) {
       return res.status(400).json({ message: "Invalid verification link" });
     }
@@ -122,25 +127,21 @@ class AuthController {
     if (!email || !password)
       throw new BadRequestException("Email and password required");
 
-    const user = await User.findOne({ email });
+    // login
+    const user = await User.findOne({ email }).select("+password");
     if (!user) throw new UnauthorizedException("Invalid credentials");
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await bcrypt.compare(password, user.password!);
     if (!isMatch) throw new UnauthorizedException("Invalid credentials");
 
-    const token = jwt.sign(
-      { id: user._id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: "7d" }
-    );
+    const token = signAuthToken(user);
 
-    // ✅ Set token in cookie
     res.cookie("token", token, {
-      httpOnly: true, // Prevent access from client-side JS
-      secure: process.env.NODE_ENV === "production", // Use HTTPS in production
+      httpOnly: true, 
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.json({
@@ -152,7 +153,9 @@ class AuthController {
           name: user.name,
           email: user.email,
           role: user.role,
+          permissions: user.permissions,
           avatar: user.avatar,
+          isEmailVerified: user.isEmailVerified,
         },
       },
     });
@@ -164,8 +167,25 @@ class AuthController {
   };
 
   me = async (req: Request, res: Response) => {
-    const user = await User.findById(req.user?.id).select("-password");
-    res.json({ status: true, data: user });
+    if (!req.user?.id) return res.status(401).json({ message: "Unauthorized" });
+    const user = await User.findById(req.user.id).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    res.json({
+      status: true,
+      data: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        avatar: user.avatar,
+        isEmailVerified: user.isEmailVerified,
+        phone: user.phone,
+        isPhoneVerified: user.isPhoneVerified,
+        createdAt: user.createdAt,
+      },
+    });
   };
 
   updateProfile = async (req: Request, res: Response) => {
@@ -173,8 +193,8 @@ class AuthController {
     const user = await User.findByIdAndUpdate(
       req.user?.id,
       { name, phone, avatar },
-      { new: true }
-    );
+      { new: true, runValidators: true }
+    ).select("-password");
     res.json({ status: true, data: user, message: "Profile Updated" });
   };
 
@@ -187,7 +207,7 @@ class AuthController {
     if (!isMatch)
       return res.status(400).json({ message: "Incorrect current password" });
 
-    user.password = newPassword;
+    user.password = newPassword; // pre('save') will hash
     await user.save();
     res.json({ message: "Password updated successfully" });
   };
@@ -196,22 +216,23 @@ class AuthController {
     const { email } = req.body;
     const user = await User.findOne({ email });
 
-    // Always send same response to prevent email enumeration
+    // Always send same response
     if (!user) {
       return res
         .status(200)
         .json({ message: "If account exists, a reset email has been sent." });
     }
 
-    // Generate secure random token and hash it
     const token = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
-    user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpires = Date.now() + 1000 * 60 * 15; // 15 minutes
+    user.resetPasswordToken = hashedToken as any;
+    user.resetPasswordExpires = Date.now() + 1000 * 60 * 15;
     await user.save();
 
-    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}&email=${email}`;
+    const resetUrl = `${process.env.CLIENT_URL}/reset-password?token=${token}&email=${encodeURIComponent(
+      email
+    )}`;
     await sendEmail({
       to: user.email,
       type: "reset-password",
@@ -236,7 +257,7 @@ class AuthController {
 
     user.password = password;
     user.resetPasswordToken = undefined;
-    user.resetPasswordExpires = undefined;
+    user.resetPasswordExpires = undefined as any;
     await user.save();
 
     res.json({ message: "Password successfully reset." });
@@ -248,9 +269,9 @@ class AuthController {
       return res.status(400).json({ message: "Phone number not found" });
     }
 
-    const code = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
     user.phoneVerificationCode = code;
-    user.phoneVerificationExpires = Date.now() + 1000 * 60 * 5; // 5 minutes
+    user.phoneVerificationExpires = new Date(Date.now() + 5 * 60 * 1000);
     await user.save();
 
     await sendEmail({
@@ -264,21 +285,20 @@ class AuthController {
 
   verifyPhoneCode = async (req: Request, res: Response) => {
     const { code } = req.body;
-
     const user = await User.findById(req.user?.id);
 
     if (
       !user ||
       user.phoneVerificationCode !== code ||
       !user.phoneVerificationExpires ||
-      user.phoneVerificationExpires < Date.now()
+      user.phoneVerificationExpires.getTime() < Date.now()
     ) {
       return res.status(400).json({ message: "Invalid or expired code" });
     }
 
     user.isPhoneVerified = true;
     user.phoneVerificationCode = undefined;
-    user.phoneVerificationExpires = undefined;
+    user.phoneVerificationExpires = undefined as any;
     await user.save();
 
     res.json({ message: "Phone number verified successfully" });

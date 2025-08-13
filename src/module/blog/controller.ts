@@ -1,10 +1,41 @@
+// blog/controller.ts
 import { Request, Response } from "express";
 import catchAsync from "../../shared/request";
 import { BlogPost } from "./model";
 import { paginate } from "../../common/utils/pagination";
-import createPostSchema from "./validation/blog";
+import createPostSchema, {
+  commentSchema,
+  updatePostSchema,
+} from "./validation/blog";
+import slugify from "../../common/utils/slugify";
+import { PipelineStage } from "mongoose";
+
+// Allow only certain fields on update
+const ALLOWED_UPDATE_FIELDS = [
+  "title",
+  "slug",
+  "content",
+  "excerpt",
+  "cover",
+  "tags",
+  "status", // still ok to move draft ↔ scheduled ↔ archived
+  "scheduledFor",
+  "isFeatured",
+  "metaTitle",
+  "metaDescription",
+  "ogImage",
+  "canonical",
+  "allowComments",
+] as const;
+
+const pick = <T extends object>(obj: T, allowed: readonly (keyof T)[]) =>
+  allowed.reduce((acc, key) => {
+    if (obj[key] !== undefined) (acc as any)[key] = obj[key];
+    return acc;
+  }, {} as Partial<T>);
 
 export class BlogPostController {
+  // GET /posts (public): only published & not deleted unless authenticated + role=admin
   static findAll = catchAsync(async (req: Request, res: Response) => {
     const {
       page = 1,
@@ -15,11 +46,19 @@ export class BlogPostController {
       featured,
       trending,
       search,
-    } = req.query;
+      from,
+      to,
+    } = req.query as Record<string, string>;
 
-    const filter: any = {};
-    if (status) filter.status = status;
-    if (tag) filter.tags = tag;
+    const isAdmin = (req as any).user?.role === "admin";
+
+    const filter: any = { isDeleted: false };
+
+    if (isAdmin && status) filter.status = status;
+    if (!isAdmin) filter.status = "published";
+
+    if (tag)
+      filter.tags = { $in: tag.split(",").map((s) => s.trim().toLowerCase()) };
     if (author) filter.author = author;
     if (featured === "true") filter.isFeatured = true;
 
@@ -29,49 +68,100 @@ export class BlogPostController {
       filter.createdAt = { $gte: weekAgo };
     }
 
-    if (search) {
-      filter.title = { $regex: search as string, $options: "i" };
+    if (from || to) {
+      filter.publishedAt = {};
+      if (from) filter.publishedAt.$gte = new Date(from);
+      if (to) filter.publishedAt.$lte = new Date(to);
     }
 
-    // Paginate with filters
-    const blogs = await paginate(BlogPost, filter, Number(page), Number(limit));
+    if (search) {
+      filter.$text = { $search: search };
+    }
 
-    // const posts = await BlogPost.find(filter).sort({ publishedAt: -1 });
+    const blogs = await paginate(BlogPost, filter, {
+      page: Number(page),
+      limit: Number(limit),
+      sort: { publishedAt: -1, createdAt: -1 },
+      select:
+        "title slug excerpt cover tags author publishedAt status likes views isFeatured readingTime wordCount",
+      populate: { path: "author", select: "name avatar" }, // optional
+      lean: true, // good for API performance
+    });
+
     return res.json({ status: true, ...blogs });
   });
 
+  // GET /posts/:slug (public)
   static findOne = catchAsync(async (req: Request, res: Response) => {
-    const post = await BlogPost.findOne({ slug: req.params.slug });
+    const isAdmin = (req as any).user?.role === "admin";
+    const filter: any = { slug: req.params.slug, isDeleted: false };
+    if (!isAdmin) filter.status = "published";
+
+    const post = await BlogPost.findOne(filter)
+      .populate("author", "name avatar")
+      .select("-comments.status -isDeleted")
+      .lean();
+
     if (!post) {
       return res.status(404).json({ status: false, message: "Post not found" });
     }
     return res.json({ status: true, data: post });
   });
 
-  static create = catchAsync(async (req: Request, res: Response) => {
-    try {
-      const validatedData = createPostSchema.parseAsync(req.body);
+  // GET /admin/posts/:id (admin only)
+  static findById = catchAsync(async (req: Request, res: Response) => {
+    const post = await BlogPost.findById(req.params.id)
+      .populate("author", "name avatar")
+      .select("-comments.status -isDeleted")
+      .lean();
 
-      const post = await BlogPost.create(validatedData);
-
-      res.status(201).json({
-        message: "Post created successfully",
-        data: post,
-      });
-    } catch (error) {
-      res.status(500).json({ message: "Post creation failed", details: error });
+    if (!post) {
+      return res.status(404).json({ status: false, message: "Post not found" });
     }
+    return res.json({ status: true, data: post });
   });
 
+  // POST /posts (admin)
+  static create = catchAsync(async (req: Request, res: Response) => {
+    let payload = await createPostSchema.parseAsync(req.body);
+    const author = req?.user?.id;
+    // Generate/normalize slug if needed
+    const slug = payload.slug ? payload.slug : slugify(payload.title);
+
+    const exists = await BlogPost.findOne({ slug });
+    if (exists) return res.status(409).json({ message: "Slug already exists" });
+
+    const post = await BlogPost.create({ ...payload, slug, author });
+
+    // If scheduled in the past, pre‑save hook will publish it
+    return res
+      .status(201)
+      .json({ message: "Post created successfully", data: post });
+  });
+
+  // PUT /posts/:id (admin) — full update
   static update = catchAsync(async (req: Request, res: Response) => {
-    const updatedPost = await BlogPost.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true },
-    );
+    const payload = await updatePostSchema.parseAsync(req.body);
+    const data = pick(payload, ALLOWED_UPDATE_FIELDS);
+
+    if (data.slug) {
+      const exists = await BlogPost.findOne({
+        slug: data.slug,
+        _id: { $ne: req.params.id },
+      });
+      if (exists)
+        return res.status(409).json({ message: "Slug already exists" });
+    }
+
+    const updatedPost = await BlogPost.findByIdAndUpdate(req.params.id, data, {
+      new: true,
+      runValidators: true,
+    });
+
     if (!updatedPost) {
       return res.status(404).json({ status: false, message: "Post not found" });
     }
+
     return res.json({
       status: true,
       message: "Post updated",
@@ -79,11 +169,212 @@ export class BlogPostController {
     });
   });
 
+  // PATCH /posts/:id/publish (admin)
+  static publish = catchAsync(async (req: Request, res: Response) => {
+    const post = await BlogPost.findById(req.params.id);
+    if (!post)
+      return res.status(404).json({ status: false, message: "Post not found" });
+
+    post.status = "published";
+    post.publishedAt = new Date();
+    await post.save();
+
+    // Optional: trigger Next.js revalidation
+    // await fetch(process.env.REVALIDATE_URL!, { method: "POST", body: JSON.stringify({ tag: "blog" }) });
+
+    return res.json({ status: true, message: "Post published", data: post });
+  });
+
+  // PATCH /posts/:id/schedule (admin)  body: { scheduledFor: ISO }
+  static schedule = catchAsync(async (req: Request, res: Response) => {
+    const { scheduledFor } = req.body;
+    if (!scheduledFor)
+      return res.status(400).json({ message: "scheduledFor required" });
+
+    const post = await BlogPost.findByIdAndUpdate(
+      req.params.id,
+      { status: "scheduled", scheduledFor },
+      { new: true }
+    );
+    if (!post)
+      return res.status(404).json({ status: false, message: "Post not found" });
+    return res.json({ status: true, message: "Post scheduled", data: post });
+  });
+
+  // PATCH /posts/:id/feature (admin) body: { isFeatured: boolean }
+  static toggleFeature = catchAsync(async (req: Request, res: Response) => {
+    const { isFeatured } = req.body;
+    const post = await BlogPost.findByIdAndUpdate(
+      req.params.id,
+      { isFeatured: !!isFeatured },
+      { new: true }
+    );
+    if (!post)
+      return res.status(404).json({ status: false, message: "Post not found" });
+    return res.json({ status: true, message: "Post updated", data: post });
+  });
+
+  // DELETE /posts/:id (admin) — soft delete
   static remove = catchAsync(async (req: Request, res: Response) => {
-    const deleted = await BlogPost.findByIdAndDelete(req.params.id);
+    const deleted = await BlogPost.findByIdAndUpdate(
+      req.params.id,
+      { isDeleted: true },
+      { new: true }
+    );
     if (!deleted) {
       return res.status(404).json({ status: false, message: "Post not found" });
     }
     return res.json({ status: true, message: "Post deleted" });
+  });
+
+  // POST /posts/:id/view (public)
+  static addView = catchAsync(async (req: Request, res: Response) => {
+    await BlogPost.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
+    return res.json({ status: true });
+  });
+
+  // POST /posts/:id/like (public/auth) — toggle like per user? simple global like:
+  static like = catchAsync(async (req: Request, res: Response) => {
+    await BlogPost.findByIdAndUpdate(req.params.id, { $inc: { likes: 1 } });
+    return res.json({ status: true });
+  });
+
+  // ----- Comments -----
+  // POST /posts/:id/comments
+  static addComment = catchAsync(async (req: Request, res: Response) => {
+    const post = await BlogPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+    if (!post.allowComments)
+      return res.status(400).json({ message: "Comments disabled" });
+
+    const data = await commentSchema.parseAsync(req.body);
+    post.comments.push({
+      author: (data.author as any) ?? null,
+      authorName: data.authorName,
+      authorEmail: data.authorEmail,
+      content: data.content,
+      status: "pending", // moderation
+      likes: 0,
+    });
+    await post.save();
+    return res
+      .status(201)
+      .json({ status: true, message: "Comment submitted for review" });
+  });
+
+  // PATCH /posts/:id/comments/:commentId (admin) — approve/spam/delete
+  static moderateComment = catchAsync(async (req: Request, res: Response) => {
+    const { status } = req.body as {
+      status: "approved" | "pending" | "spam" | "deleted";
+    };
+
+    const post = await BlogPost.findById(req.params.id);
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    // Find subdoc manually
+    const comment = post.comments.find(
+      (c: any) => c._id?.toString() === req.params.commentId
+    );
+
+    if (!comment) return res.status(404).json({ message: "Comment not found" });
+
+    comment.status = status;
+    await post.save();
+    return res.json({ status: true, message: "Comment updated" });
+  });
+
+  static listAllComments = catchAsync(async (req: Request, res: Response) => {
+    const {
+      status = "pending",
+      page = "1",
+      limit = "20",
+      search,
+      slug,
+    } = req.query as Record<string, string>;
+
+    const pageNum = Number(page);
+    const limitNum = Number(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const pipeline: PipelineStage[] = [];
+
+    pipeline.push({ $match: { isDeleted: false } });
+    if (slug) pipeline.push({ $match: { slug } });
+
+    // use object form for $unwind to satisfy typings
+    pipeline.push({ $unwind: { path: "$comments" } });
+
+    pipeline.push({ $match: { "comments.status": status } });
+
+    if (search) {
+      pipeline.push({
+        $match: { "comments.content": { $regex: search, $options: "i" } },
+      });
+    }
+
+    pipeline.push({ $sort: { "comments.createdAt": -1 } });
+
+    pipeline.push({
+      $project: {
+        _id: 0,
+        postId: "$_id",
+        postSlug: "$slug",
+        postTitle: "$title",
+        comment: "$comments",
+      },
+    });
+
+    const [items, totalArr] = await Promise.all([
+      BlogPost.aggregate([...pipeline, { $skip: skip }, { $limit: limitNum }]),
+      BlogPost.aggregate([...pipeline, { $count: "count" }]),
+    ]);
+
+    const totalCount = totalArr[0]?.count ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalCount / limitNum));
+
+    return res.json({
+      status: true,
+      data: items, // [{ postId, postSlug, postTitle, comment }]
+      meta: {
+        totalCount,
+        pageSize: limitNum,
+        currentPage: pageNum,
+        totalPages,
+        hasNextPage: pageNum < totalPages,
+        hasPreviousPage: pageNum > 1,
+      },
+    });
+  });
+
+  static listComments = catchAsync(async (req: Request, res: Response) => {
+    const post = await BlogPost.findOne({
+      slug: req.params.slug,
+      isDeleted: false,
+    })
+      .select("comments")
+      .lean();
+    if (!post) return res.status(404).json({ message: "Post not found" });
+
+    const comments = (post.comments || []).filter(
+      (c) => c.status === "approved"
+    );
+    return res.json({ status: true, data: comments });
+  });
+
+  static scheduled = catchAsync(async (req: Request, res: Response) => {
+    const from = req.query.from
+      ? new Date(String(req.query.from))
+      : new Date(Date.now() - 15 * 864e5);
+    const to = req.query.to
+      ? new Date(String(req.query.to))
+      : new Date(Date.now() + 45 * 864e5);
+    const posts = await BlogPost.find({
+      isDeleted: false,
+      status: "scheduled",
+      scheduledFor: { $gte: from, $lte: to },
+    })
+      .select("title slug scheduledFor")
+      .lean();
+    res.json({ status: true, data: posts });
   });
 }
