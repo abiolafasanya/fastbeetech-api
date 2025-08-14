@@ -1,0 +1,12 @@
+node_modules
+npm-debug.log
+Dockerfile*
+docker-compose*.yml
+.git
+.gitignore
+.env
+.env.*
+coverage
+.vscode
+dist/*
+# If your build produces dist during docker build, it will be copied from the builder stage.
