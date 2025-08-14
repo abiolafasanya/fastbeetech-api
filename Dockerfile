@@ -23,10 +23,7 @@ COPY . .
 # Otherwise, ensure your build step outputs to dist or skip this line
 RUN npm run build
 
-# If your build needs to carry static/templates into dist, do it here:
-# (uncomment if applicable)
-# RUN cp -r src/views dist/ 2>/dev/null || true
-# RUN cp -r public dist/ 2>/dev/null || true
+
 
 # ---------- Production image (only runtime files) ----------
 FROM node:22-alpine AS runtime
@@ -43,18 +40,10 @@ RUN npm ci --omit=dev
 
 # Copy the built app and any runtime assets
 COPY --from=builder --chown=app:app /app/dist ./dist
-# If you kept static/templates outside of dist, copy them too:
-# COPY --from=builder --chown=app:app /app/public ./public
-# COPY --from=builder --chown=app:app /app/src/views ./views
 
 # Set the port (change if your app uses a different one)
 ENV PORT=4000
 EXPOSE 4000
 
-# Optional: lightweight healthcheck (change path to match your app)
-# HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  # CMD wget -qO- "http://127.0.0.1:${PORT}/health" || exit 1
 
-# If your start script runs "node dist/index.js", keep npm start.
-# Otherwise, you can do: CMD ["node", "dist/index.js"]
 CMD ["npm", "start"]
