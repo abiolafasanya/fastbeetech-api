@@ -5,7 +5,6 @@ import cors from "cors";
 import routeHandler from "./routes";
 import helmet from "helmet";
 import path from "path";
-import bodyParser from "body-parser";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import logger from "./common/middleware/logger";
@@ -79,6 +78,10 @@ app.use((req, res, next) => {
 //Data sanitization against NoSQL query injection
 routeHandler(apiRouter);
 app.use("/api/v1", apiRouter);
+
+app.use("/health-check", (req, res) => {
+  res.send("Server is running...")
+})
 
 app.use((req, res, next) => {
   const message = `Can't find ${req.originalUrl} on this server`;
