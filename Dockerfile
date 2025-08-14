@@ -1,49 +1,20 @@
-# ---------- Base image ----------
-FROM node:trixie-slim AS base
-WORKDIR /app
-ENV NODE_ENV=production
-# Ensure reproducible installs
-ENV npm_config_fund=false \
-    npm_config_audit=false
+# Use an official Node.js runtime as a parent image
+FROM node:lts-slim
 
-# ---------- Builder (installs dev deps + builds) ----------
-FROM node:trixie-slim AS builder
+# Set the working directory to /app
 WORKDIR /app
 
-# System deps only for build (node-gyp, etc.)
-RUN apk add --no-cache python3 make g++ git
+# Copy the current directory contents into the container at /app
+COPY . /app
 
-# Install deps
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Install dependencies
+RUN npm install
 
-# Copy source and build
-COPY . .
-# If you use TypeScript, this should produce /app/dist
-# Otherwise, ensure your build step outputs to dist or skip this line
+# Build the application
 RUN npm run build
 
-
-
-# ---------- Production image (only runtime files) ----------
-FROM node:trixie-slim AS runtime
-WORKDIR /app
-ENV NODE_ENV=production
-
-# Create a non-root user
-RUN addgroup -S app && adduser -S app -G app
-USER app
-
-# Copy only the files needed at runtime
-COPY --chown=app:app package.json package-lock.json* ./
-RUN npm ci --omit=dev
-
-# Copy the built app and any runtime assets
-COPY --from=builder --chown=app:app /app/dist ./dist
-
-# Set the port (change if your app uses a different one)
-ENV PORT=4000
+# Expose port 3000
 EXPOSE 4000
 
-
+# Start the application
 CMD ["npm", "start"]
