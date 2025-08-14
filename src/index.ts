@@ -65,7 +65,7 @@ app.use(
   )
 );
 
-const port = Number(process.env.PORT || 4000);
+const port = process.env.PORT || 4000;
 
 // Routes
 app.use((req, res, next) => {
