@@ -1,5 +1,5 @@
 # ---------- Base image ----------
-FROM node:22-alpine AS base
+FROM node:trixie-slim AS base
 WORKDIR /app
 ENV NODE_ENV=production
 # Ensure reproducible installs
@@ -7,7 +7,7 @@ ENV npm_config_fund=false \
     npm_config_audit=false
 
 # ---------- Builder (installs dev deps + builds) ----------
-FROM node:22-alpine AS builder
+FROM node:trixie-slim AS builder
 WORKDIR /app
 
 # System deps only for build (node-gyp, etc.)
@@ -26,7 +26,7 @@ RUN npm run build
 
 
 # ---------- Production image (only runtime files) ----------
-FROM node:22-alpine AS runtime
+FROM node:trixie-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 
