@@ -1,5 +1,5 @@
 # Use an official Node.js runtime as a parent image
-FROM node:lts-alphine
+FROM node:lts-alpine3.22
 
 # Set the working directory to /app
 WORKDIR /app
