@@ -48,8 +48,8 @@ COPY --from=builder --chown=app:app /app/dist ./dist
 # COPY --from=builder --chown=app:app /app/src/views ./views
 
 # Set the port (change if your app uses a different one)
-ENV PORT=4000
-EXPOSE 4000
+ENV PORT=8000
+EXPOSE 8000
 
 # Optional: lightweight healthcheck (change path to match your app)
 # HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
