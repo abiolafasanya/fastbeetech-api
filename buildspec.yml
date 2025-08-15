@@ -1,0 +1,35 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_NAME: CODEBUILD_RESOLVED_SOURCE_VERSION:-latest
+
+phases:
+  pre_build:
+    commands:
+      - aws --version
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - REGION=${AWS_DEFAULT_REGION}
+      - REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME"
+      - aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
+      - TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+
+  build:
+    commands:
+      - docker build -t "$REPO_URI:$TAG" .
+      - docker push "$REPO_URI:$TAG"
+
+  post_build:
+    commands:
+      - |
+        printf '{
+          "AWSEBDockerrunVersion": "1",
+          "Image": {"Name": "%s","Update": "true"},
+          "Ports": [{"ContainerPort": "8080"}]
+        }\n' "$REPO_URI:$TAG" > Dockerrun.aws.json
+
+artifacts:
+  files:
+    - Dockerrun.aws.json
+    - .ebextensions/**/*
+  discard-paths: no
