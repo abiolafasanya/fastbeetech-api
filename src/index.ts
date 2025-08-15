@@ -65,7 +65,7 @@ app.use(
   )
 );
 
-const port = process.env.PORT || 4000;
+const port = process.env.PORT || 5000;
 
 // Routes
 app.use((req, res, next) => {
@@ -80,8 +80,12 @@ routeHandler(apiRouter);
 app.use("/api/v1", apiRouter);
 
 app.use("/health-check", (req, res) => {
-  res.send("Server is running...")
-})
+  res.send("Server is running...");
+});
+
+app.use("/", (req, res) => {
+  res.send("Server is running...");
+});
 
 app.use((req, res, next) => {
   const message = `Can't find ${req.originalUrl} on this server`;

@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { User } from "./model";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import {
   BadRequestException,
@@ -64,6 +63,7 @@ class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
+      domain: ".fastbeetech.com",
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -137,9 +137,10 @@ class AuthController {
     const token = signAuthToken(user);
 
     res.cookie("token", token, {
-      httpOnly: true, 
+      httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
+      domain: ".fastbeetech.com",
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });

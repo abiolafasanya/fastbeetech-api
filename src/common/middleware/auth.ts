@@ -61,7 +61,6 @@ export const authorize =
   (...allowedRoles: Array<Express.UserJwtPayload["role"]>) =>
   (req: Request, res: Response, next: NextFunction) => {
     const role = req.user?.role;
-    console.log(role);
     if (!role) return res.status(401).json({ message: "Unauthorized" });
 
     if (!allowedRoles.includes(role)) {
