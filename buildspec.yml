@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    IMAGE_NAME: fastbeetech-api
+    IMAGE_NAME: fastbeetech-api        # <-- your ECR repo name
 
 phases:
   pre_build:
@@ -12,7 +12,7 @@ phases:
       - REGION=${AWS_DEFAULT_REGION}
       - REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME"
       - aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-      - TAG=${fastbeetech-api:-latest}
+      - TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}   # <-- tag = commit SHA (fallback latest)
 
   build:
     commands:
