@@ -1,21 +1,27 @@
-# Use an official Node.js runtime as a parent image
-# FROM node:lts-slim
-FROM public.ecr.aws/docker/library/node:lts-alpine3.22
-
-# Set the working directory to /app
+# ---------- Build stage ----------
+FROM public.ecr.aws/docker/library/node:lts-alpine3.22 AS builder
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+COPY package*.json ./
+RUN npm ci
 
-# Install dependencies
-RUN npm install
-
-# Build the application
+COPY . .
 RUN npm run build
 
-# Expose port 3000
-EXPOSE 4000
+# ---------- Runtime stage ----------
+FROM public.ecr.aws/docker/library/node:lts-alpine3.22
+ENV NODE_ENV=production
+WORKDIR /app
 
-# Start the application
-CMD ["npm", "start"]
+COPY package*.json ./
+RUN npm ci --omit=dev --ignore-scripts
+
+# only the built artifacts + any assets you need
+COPY --from=builder /app/dist ./dist
+# COPY --from=builder /app/public ./public
+# COPY --from=builder /app/views  ./views
+
+ENV PORT=8080
+EXPOSE 8080
+
+CMD ["node", "dist/index.js"]
