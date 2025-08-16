@@ -3,3 +3,4 @@ node_modules
 dist
 prod.env
 # package-lock.json
+dist.zip
