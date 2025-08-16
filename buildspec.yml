@@ -2,7 +2,7 @@ version: 0.2
 
 env:
   variables:
-    IMAGE_NAME: CODEBUILD_RESOLVED_SOURCE_VERSION:-latest
+    IMAGE_NAME: fastbeetech-api
 
 phases:
   pre_build:
@@ -12,7 +12,7 @@ phases:
       - REGION=${AWS_DEFAULT_REGION}
       - REPO_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$IMAGE_NAME"
       - aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com"
-      - TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:-latest}
+      - TAG=${fastbeetech-api:-latest}
 
   build:
     commands:
