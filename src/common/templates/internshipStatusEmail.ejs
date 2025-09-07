@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Internship Application Status - Hexonest</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Arial, sans-serif;
+        background: #f8fafc;
+        color: #222;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 480px;
+        margin: 40px auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
+        padding: 32px 24px 24px 24px;
+      }
+      .logo {
+        display: block;
+        margin: 0 auto 24px auto;
+        width: 160px;
+      }
+      .brand {
+        text-align: center;
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: #0e1a2b;
+        margin-bottom: 8px;
+      }
+      .status {
+        font-size: 1.1rem;
+        color: #2563eb;
+        font-weight: 500;
+      }
+      .footer {
+        margin-top: 32px;
+        font-size: 0.95rem;
+        color: #555;
+        text-align: center;
+      }
+      .contact {
+        margin-top: 8px;
+        color: #2563eb;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <img
+        src="https://hexonest.com.ng/hexonest-logo-light.svg"
+        alt="Hexonest Logo"
+        class="logo"
+      />
+      <div class="brand">Hexonest</div>
+      <p>Hi <%= name %>,</p>
+      <p>Your internship application status is now:</p>
+      <div class="status"><%= status.toUpperCase() %></div>
+      <p>
+        Thank you for applying to Hexonest! We appreciate your interest and will
+        be in touch soon.
+      </p>
+      <div class="footer">
+        Contact us: <span class="contact">[Contact Number]</span> |
+        <span class="contact">[Contact Email]</span>
+      </div>
+    </div>
+  </body>
+</html>

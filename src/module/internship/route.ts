@@ -7,5 +7,15 @@ export default function (router: Router) {
   router.get("/internship/:id", InternshipController.findOne);
   router.post("/internship", InternshipController.create);
   router.put("/internship/:id", authenticate, InternshipController.update);
+  router.patch(
+    "/internship/:id/status",
+    authenticate,
+    InternshipController.updateStatus
+  );
+  router.post(
+    "/internship/:id/send-mail",
+    authenticate,
+    InternshipController.sendMail
+  );
   router.delete("/internship/:id", authenticate, InternshipController.remove);
 }

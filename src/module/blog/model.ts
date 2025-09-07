@@ -15,6 +15,11 @@ export interface BlogComment {
   updatedAt?: Date;
 }
 
+export interface BlogPostReactionByUser {
+  user: Types.ObjectId;
+  type: string;
+}
+
 export interface BlogPostType {
   title: string;
   slug: string;
@@ -30,6 +35,16 @@ export interface BlogPostType {
   // Engagement
   likes: number;
   views: number;
+  reactions: {
+    like: number;
+    love: number;
+    clap: number;
+    wow: number;
+    [key: string]: number;
+  };
+  reactionsByUser: BlogPostReactionByUser[];
+  shares: number;
+  sharesByUser: { user: Types.ObjectId; sharedAt: Date }[];
 
   // Flags
   isFeatured: boolean;
@@ -97,6 +112,24 @@ const BlogPostSchema = new Schema<IBlogPost>(
 
     likes: { type: Number, default: 0 },
     views: { type: Number, default: 0 },
+    reactions: {
+      type: Object,
+      default: { like: 0, love: 0, clap: 0, wow: 0 },
+    },
+    reactionsByUser: [
+      {
+        user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        type: { type: String, required: true },
+      },
+    ],
+
+    shares: { type: Number, default: 0 },
+    sharesByUser: [
+      {
+        user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        sharedAt: { type: Date, default: Date.now },
+      },
+    ],
 
     isFeatured: { type: Boolean, default: false },
 

@@ -4,3 +4,6 @@ dist
 prod.env
 # package-lock.json
 dist.zip
+bun.lock
+package-lock.json
+yarn.lock

@@ -135,12 +135,12 @@ class AuthController {
     if (!isMatch) throw new UnauthorizedException("Invalid credentials");
 
     const token = signAuthToken(user);
-
+const isProd = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
       sameSite: "lax",
-      domain: ".fastbeetech.com",
+      domain: isProd ? ".fastbeetech.com": undefined, // set domain only in production
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });

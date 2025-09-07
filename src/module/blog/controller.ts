@@ -1,3 +1,4 @@
+// ...existing code...
 // blog/controller.ts
 import { Request, Response } from "express";
 import catchAsync from "../../shared/request";
@@ -9,6 +10,7 @@ import createPostSchema, {
 } from "./validation/blog";
 import slugify from "../../common/utils/slugify";
 import { PipelineStage } from "mongoose";
+import mongoose from "mongoose";
 
 // Allow only certain fields on update
 const ALLOWED_UPDATE_FIELDS = [
@@ -35,8 +37,85 @@ const pick = <T extends object>(obj: T, allowed: readonly (keyof T)[]) =>
   }, {} as Partial<T>);
 
 export class BlogPostController {
+  // POST /posts/:id/share
+  static share = catchAsync(async (req: Request, res: Response) => {
+    const userId = req.user?.id;
+    if (!userId)
+      return res.status(401).json({ status: false, message: "Unauthorized" });
+    const post = await BlogPost.findById(req.params.id);
+    if (!post)
+      return res.status(404).json({ status: false, message: "Post not found" });
+    const alreadyShared = post.sharesByUser.some(
+      (s: any) => s.user.toString() === userId
+    );
+    if (alreadyShared) {
+      return res.json({ status: true, shares: post.shares, shared: true });
+    }
+    post.shares += 1;
+    post.sharesByUser.push({
+      user: new mongoose.Types.ObjectId(userId),
+      sharedAt: new Date(),
+    });
+    await post.save();
+    return res.json({ status: true, shares: post.shares, shared: true });
+  });
   // GET /posts (public): only published & not deleted unless authenticated + role=admin
   static findAll = catchAsync(async (req: Request, res: Response) => {
+    const {
+      page = 1,
+      limit = 10,
+      tag,
+      status,
+      author,
+      featured,
+      trending,
+      search,
+      from,
+      to,
+    } = req.query as Record<string, string>;
+
+    const isAdmin = (req as any).user?.role === "admin";
+
+    const filter: any = { isDeleted: false };
+
+    if (isAdmin && status) filter.status = status;
+    if (!isAdmin) filter.status = "published";
+
+    if (tag)
+      filter.tags = { $in: tag.split(",").map((s) => s.trim().toLowerCase()) };
+    if (author) filter.author = author;
+    if (featured === "true") filter.isFeatured = true;
+
+    if (trending === "true") {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      filter.createdAt = { $gte: weekAgo };
+    }
+
+    if (from || to) {
+      filter.publishedAt = {};
+      if (from) filter.publishedAt.$gte = new Date(from);
+      if (to) filter.publishedAt.$lte = new Date(to);
+    }
+
+    if (search) {
+      filter.$text = { $search: search };
+    }
+
+    const blogs = await paginate(BlogPost, filter, {
+      page: Number(page),
+      limit: Number(limit),
+      sort: { publishedAt: -1, createdAt: -1 },
+      select:
+        "title slug excerpt cover tags author publishedAt status likes views isFeatured readingTime wordCount",
+      populate: { path: "author", select: "name avatar" }, // optional
+      lean: true, // good for API performance
+    });
+
+    return res.json({ status: true, ...blogs });
+  });
+
+  static allPosts = catchAsync(async (req: Request, res: Response) => {
     const {
       page = 1,
       limit = 10,
@@ -118,7 +197,17 @@ export class BlogPostController {
     if (!post) {
       return res.status(404).json({ status: false, message: "Post not found" });
     }
-    return res.json({ status: true, data: post });
+    // Attach current userId if available
+    const userId = req.user?.id || null;
+    return res.json({
+      status: true,
+      data: {
+        ...post,
+        reactions: post.reactions,
+        reactionsByUser: post.reactionsByUser,
+        currentUserId: userId,
+      },
+    });
   });
 
   // POST /posts (admin)
@@ -233,16 +322,57 @@ export class BlogPostController {
     return res.json({ status: true });
   });
 
-  // POST /posts/:id/like (public/auth) — toggle like per user? simple global like:
-  static like = catchAsync(async (req: Request, res: Response) => {
-    await BlogPost.findByIdAndUpdate(req.params.id, { $inc: { likes: 1 } });
-    return res.json({ status: true });
+  // POST /posts/:id/react (public/auth) — support multiple reaction types
+  static react = catchAsync(async (req: Request, res: Response) => {
+    const { type } = req.body as { type: string };
+    const allowed = ["like", "love", "clap", "wow"];
+    if (!type || !allowed.includes(type)) {
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid reaction type" });
+    }
+    const userId = req.user?.id;
+    if (!userId)
+      return res.status(401).json({ status: false, message: "Unauthorized" });
+    const post = await BlogPost.findById(req.params.id);
+    if (!post)
+      return res.status(404).json({ status: false, message: "Post not found" });
+
+    // Remove previous reaction by user if exists
+    const prev = post.reactionsByUser.find((r) => r.user.toString() === userId);
+    if (prev) {
+      // Decrement previous type count
+      if (post.reactions[prev.type] > 0) post.reactions[prev.type] -= 1;
+      prev.type = type;
+    } else {
+      post.reactionsByUser.push({
+        user: new mongoose.Types.ObjectId(userId),
+        type,
+      });
+    }
+    // Increment new type count
+    post.reactions[type] = (post.reactions[type] || 0) + 1;
+    await post.save();
+    return res.json({
+      status: true,
+      reactions: post.reactions,
+      userReaction: type,
+    });
   });
 
   // ----- Comments -----
   // POST /posts/:id/comments
   static addComment = catchAsync(async (req: Request, res: Response) => {
-    const post = await BlogPost.findById(req.params.id);
+    // const post = await BlogPost.findById(req.params.id);
+    // should use slug or id meaning the id can be a slug or id
+    // implements
+
+    const post = await BlogPost.findOne({
+      $or: [{ _id: req.params.id }, { slug: req.params.id }],
+      isDeleted: false,
+    });
+
+    console.log(post, req.params.id);
     if (!post) return res.status(404).json({ message: "Post not found" });
     if (!post.allowComments)
       return res.status(400).json({ message: "Comments disabled" });
@@ -253,7 +383,7 @@ export class BlogPostController {
       authorName: data.authorName,
       authorEmail: data.authorEmail,
       content: data.content,
-      status: "pending", // moderation
+      status: "approved", // auto-approve for instant display
       likes: 0,
     });
     await post.save();
@@ -302,9 +432,12 @@ export class BlogPostController {
     if (slug) pipeline.push({ $match: { slug } });
 
     // use object form for $unwind to satisfy typings
+
     pipeline.push({ $unwind: { path: "$comments" } });
 
-    pipeline.push({ $match: { "comments.status": status } });
+    if (status && status !== "all") {
+      pipeline.push({ $match: { "comments.status": status } });
+    }
 
     if (search) {
       pipeline.push({

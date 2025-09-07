@@ -10,8 +10,10 @@ export default function (router: Router) {
   router.get("/posts/:slug", BlogPostController.findOne);
   router.get("/posts/:slug/comments", BlogPostController.listComments);
   router.post("/posts/:id/view", BlogPostController.addView);
-  router.post("/posts/:id/like", authenticate, BlogPostController.like); // or allow guests
+  router.post("/posts/:id/react", authenticate, BlogPostController.react); // require auth for per-user reactions
+  router.post("/posts/:id/share", authenticate, BlogPostController.share); // require auth for per-user share
   // router.ts
+  router.get("/admin/posts", authenticate, BlogPostController.allPosts);
   router.get(
     "/admin/posts/:id",
     authenticate,
@@ -71,6 +73,14 @@ export default function (router: Router) {
     authenticate,
     authorize("admin"),
     BlogPostController.moderateComment
+  );
+
+  // Moderation: List all comments for admin dashboard
+  router.get(
+    "/admin/comments",
+    authenticate,
+    authorize("admin"),
+    BlogPostController.listAllComments
   );
 
   router.get(
