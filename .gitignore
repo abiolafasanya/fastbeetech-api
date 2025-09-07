@@ -5,5 +5,5 @@ prod.env
 # package-lock.json
 dist.zip
 bun.lock
-package-lock.json
+# package-lock.json
 yarn.lock
