@@ -1,7 +1,7 @@
 {
-  "name": "fastbeetech-api",
+  "name": "hexonest-api",
   "version": "1.0.0",
-  "description": "Fastbeetech API",
+  "description": "Hexonest API",
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
