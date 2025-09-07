@@ -63,7 +63,7 @@ class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      domain: ".fastbeetech.com",
+      // Remove domain restriction for now - cookies will work for current domain
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -135,12 +135,12 @@ class AuthController {
     if (!isMatch) throw new UnauthorizedException("Invalid credentials");
 
     const token = signAuthToken(user);
-const isProd = process.env.NODE_ENV === "production";
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProd,
       sameSite: "lax",
-      domain: isProd ? ".fastbeetech.com": undefined, // set domain only in production
+      // Remove domain restriction - let cookies work for current domain
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
