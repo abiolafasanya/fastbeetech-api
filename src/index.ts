@@ -25,9 +25,30 @@ app.use(express.static(path.join(__dirname, "../public")));
 // app.use(bodyParser.urlencoded({ limit: "100mb", extended: true }));
 app.use(cookieParser()); // 👈 REQUIRED before your authenticate middleware
 
+// Parse allowed origins from environment variable
+const allowedOrigins = process.env.CLIENT_URLS
+  ? process.env.CLIENT_URLS.split(",").map((url) => url.trim())
+  : [
+      "https://hexonest.com.ng",
+      "https://hexonest.vercel.app",
+      "http://localhost:3000", // fallback for development
+    ];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL, // e.g., http://localhost:3000
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, etc.)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      logger.warn(`CORS blocked origin: ${origin}`);
+      return callback(
+        new Error(`CORS policy violation: Origin ${origin} not allowed`)
+      );
+    },
     credentials: true, // 🔑 allow cookies to be sent
   })
 );
