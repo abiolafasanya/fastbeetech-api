@@ -138,41 +138,21 @@ class AuthController {
     const token = signAuthToken(user);
     const isProd = process.env.NODE_ENV === "production";
 
-    console.log("=== LOGIN DEBUG ===");
-    console.log("NODE_ENV:", process.env.NODE_ENV);
-    console.log("isProd:", isProd);
-    console.log("Request headers:", {
-      origin: req.headers.origin,
-      host: req.headers.host,
-      "user-agent": req.headers["user-agent"],
-      referer: req.headers.referer,
-    });
-
     const cookieOptions = {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax" as const, // Changed back to "lax" since we're on same domain
-      domain: isProd ? ".hexonest.com.ng" : undefined, // Add domain back for subdomains
+      sameSite: "lax" as const,
+      domain: isProd ? ".hexonest.com.ng" : undefined,
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
 
-    console.log("Setting cookie with options:", cookieOptions);
-    console.log("Production mode:", isProd);
-    console.log("Request origin:", req.headers.origin);
-
     res.cookie("token", token, cookieOptions);
-
-    // Debug: Log response headers
-    console.log("Response headers after setting cookie:");
-    console.log("Set-Cookie:", res.getHeaders()["set-cookie"]);
-    console.log("All response headers:", res.getHeaders());
 
     res.json({
       status: true,
       message: "Login successful",
       data: {
-        token, // Temporarily return token in response for debugging
         user: {
           id: user._id,
           name: user.name,
