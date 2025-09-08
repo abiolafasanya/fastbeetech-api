@@ -30,7 +30,8 @@ const allowedOrigins = process.env.CLIENT_URLS
   ? process.env.CLIENT_URLS.split(",").map((url) => url.trim())
   : [
       "https://hexonest.com.ng",
-      "https://hexonest.vercel.app",
+      "https://www.hexonest.com.ng",
+      "https://hexonest.vercel.app", // keep for fallback
       "http://localhost:3000", // fallback for development
     ];
 

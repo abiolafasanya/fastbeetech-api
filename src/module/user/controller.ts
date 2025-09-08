@@ -20,7 +20,7 @@ class AuthController {
       return res.status(400).json({ message: "Email already in use" });
 
     // Prevent privilege escalation (allow only specific roles at signup)
-    const allowedSignupRoles = new Set(["user", "agent"]); // expand if desired
+    const allowedSignupRoles = new Set(["user", "admin"]); // expand if desired
     const safeRole = allowedSignupRoles.has(role) ? role : "user";
 
     const user = await User.create({
@@ -59,11 +59,12 @@ class AuthController {
     });
 
     // Cookie
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      // Remove domain restriction for now - cookies will work for current domain
+      secure: isProd,
+      sameSite: "lax", // Can use "lax" since frontend and backend are on same domain now
+      domain: isProd ? ".hexonest.com.ng" : undefined, // Set domain for production to share across subdomains
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -136,14 +137,21 @@ class AuthController {
 
     const token = signAuthToken(user);
     const isProd = process.env.NODE_ENV === "production";
-    res.cookie("token", token, {
+    
+    const cookieOptions = {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax",
-      // Remove domain restriction - let cookies work for current domain
+      sameSite: "lax" as const, // Can use "lax" since frontend and backend are on same domain now
+      domain: isProd ? ".hexonest.com.ng" : undefined, // Set domain for production to share across subdomains
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
+    };
+
+    console.log("Setting cookie with options:", cookieOptions);
+    console.log("Production mode:", isProd);
+    console.log("Request origin:", req.headers.origin);
+    
+    res.cookie("token", token, cookieOptions);
 
     res.json({
       status: true,
@@ -163,7 +171,13 @@ class AuthController {
   };
 
   logout = (req: Request, res: Response) => {
-    res.clearCookie("token", { path: "/" });
+    const isProd = process.env.NODE_ENV === "production";
+    res.clearCookie("token", { 
+      path: "/",
+      secure: isProd,
+      sameSite: "lax",
+      domain: isProd ? ".hexonest.com.ng" : undefined,
+    });
     res.json({ status: true, message: "Logged out successfully" });
   };
 
