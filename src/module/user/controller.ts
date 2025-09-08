@@ -63,8 +63,8 @@ class AuthController {
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? "none" : "lax", // Use "none" for production cross-site
-      // domain: isProd ? ".hexonest.com.ng" : undefined, // Temporarily removed - let browser set domain automatically
+      sameSite: "lax", // Changed back to "lax"
+      domain: isProd ? ".hexonest.com.ng" : undefined, // Add domain back
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -138,11 +138,21 @@ class AuthController {
     const token = signAuthToken(user);
     const isProd = process.env.NODE_ENV === "production";
 
+    console.log("=== LOGIN DEBUG ===");
+    console.log("NODE_ENV:", process.env.NODE_ENV);
+    console.log("isProd:", isProd);
+    console.log("Request headers:", {
+      origin: req.headers.origin,
+      host: req.headers.host,
+      "user-agent": req.headers["user-agent"],
+      referer: req.headers.referer,
+    });
+
     const cookieOptions = {
       httpOnly: true,
       secure: isProd,
-      sameSite: isProd ? "none" as const : "lax" as const, // Use "none" for production cross-site
-      // domain: isProd ? ".hexonest.com.ng" : undefined, // Temporarily removed - let browser set domain automatically
+      sameSite: "lax" as const, // Changed back to "lax" since we're on same domain
+      domain: isProd ? ".hexonest.com.ng" : undefined, // Add domain back for subdomains
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
@@ -153,10 +163,16 @@ class AuthController {
 
     res.cookie("token", token, cookieOptions);
 
+    // Debug: Log response headers
+    console.log("Response headers after setting cookie:");
+    console.log("Set-Cookie:", res.getHeaders()["set-cookie"]);
+    console.log("All response headers:", res.getHeaders());
+
     res.json({
       status: true,
       message: "Login successful",
       data: {
+        token, // Temporarily return token in response for debugging
         user: {
           id: user._id,
           name: user.name,
@@ -175,8 +191,8 @@ class AuthController {
     res.clearCookie("token", {
       path: "/",
       secure: isProd,
-      sameSite: isProd ? "none" : "lax",
-      // domain: isProd ? ".hexonest.com.ng" : undefined, // Temporarily removed
+      sameSite: "lax", // Changed back to "lax"
+      domain: isProd ? ".hexonest.com.ng" : undefined, // Add domain back
     });
     res.json({ status: true, message: "Logged out successfully" });
   };
