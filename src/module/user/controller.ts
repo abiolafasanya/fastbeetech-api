@@ -63,8 +63,8 @@ class AuthController {
     res.cookie("token", token, {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax", // Can use "lax" since frontend and backend are on same domain now
-      domain: isProd ? ".hexonest.com.ng" : undefined, // Set domain for production to share across subdomains
+      sameSite: isProd ? "none" : "lax", // Use "none" for production cross-site
+      // domain: isProd ? ".hexonest.com.ng" : undefined, // Temporarily removed - let browser set domain automatically
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -137,12 +137,12 @@ class AuthController {
 
     const token = signAuthToken(user);
     const isProd = process.env.NODE_ENV === "production";
-    
+
     const cookieOptions = {
       httpOnly: true,
       secure: isProd,
-      sameSite: "lax" as const, // Can use "lax" since frontend and backend are on same domain now
-      domain: isProd ? ".hexonest.com.ng" : undefined, // Set domain for production to share across subdomains
+      sameSite: isProd ? "none" as const : "lax" as const, // Use "none" for production cross-site
+      // domain: isProd ? ".hexonest.com.ng" : undefined, // Temporarily removed - let browser set domain automatically
       path: "/",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     };
@@ -150,7 +150,7 @@ class AuthController {
     console.log("Setting cookie with options:", cookieOptions);
     console.log("Production mode:", isProd);
     console.log("Request origin:", req.headers.origin);
-    
+
     res.cookie("token", token, cookieOptions);
 
     res.json({
@@ -172,11 +172,11 @@ class AuthController {
 
   logout = (req: Request, res: Response) => {
     const isProd = process.env.NODE_ENV === "production";
-    res.clearCookie("token", { 
+    res.clearCookie("token", {
       path: "/",
       secure: isProd,
-      sameSite: "lax",
-      domain: isProd ? ".hexonest.com.ng" : undefined,
+      sameSite: isProd ? "none" : "lax",
+      // domain: isProd ? ".hexonest.com.ng" : undefined, // Temporarily removed
     });
     res.json({ status: true, message: "Logged out successfully" });
   };
