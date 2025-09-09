@@ -1,5 +1,9 @@
 import mongoose, { Schema, Document, model, Types } from "mongoose";
 import bcrypt from "bcrypt";
+import {
+  UserRole,
+  getRolePermissions,
+} from "../../common/config/roles-permissions";
 
 export interface IUser extends Document {
   _id: Types.ObjectId;
@@ -8,7 +12,7 @@ export interface IUser extends Document {
   // password can be omitted from query results, so mark optional for TS when not selected
   password?: string;
   phone?: string;
-  role: "user" | "author" | "editor" | "admin";
+  role: UserRole;
   permissions: string[];
   avatar?: string;
   listings: mongoose.Types.ObjectId[];
@@ -24,6 +28,9 @@ export interface IUser extends Document {
   isPhoneVerified: boolean;
 
   comparePassword: (password: string) => Promise<boolean>;
+  hasPermission: (permission: string) => boolean;
+  hasAnyPermission: (permissions: string[]) => boolean;
+  hasAllPermissions: (permissions: string[]) => boolean;
 }
 
 const UserSchema: Schema<IUser> = new Schema(
@@ -43,7 +50,16 @@ const UserSchema: Schema<IUser> = new Schema(
 
     role: {
       type: String,
-      enum: ["user", "author", "editor", "admin"],
+      enum: [
+        "user",
+        "student",
+        "instructor",
+        "author",
+        "editor",
+        "moderator",
+        "admin",
+        "super-admin",
+      ],
       default: "user",
       index: true,
     },
@@ -88,9 +104,40 @@ UserSchema.methods.comparePassword = async function (
   return bcrypt.compare(candidatePassword, this.password);
 };
 
+// Permission checking methods
+UserSchema.methods.hasPermission = function (permission: string): boolean {
+  return this.permissions.includes(permission);
+};
+
+UserSchema.methods.hasAnyPermission = function (
+  permissions: string[]
+): boolean {
+  return permissions.some((permission) =>
+    this.permissions.includes(permission)
+  );
+};
+
+UserSchema.methods.hasAllPermissions = function (
+  permissions: string[]
+): boolean {
+  return permissions.every((permission) =>
+    this.permissions.includes(permission)
+  );
+};
+
+// Pre-save middleware to assign role-based permissions
 UserSchema.pre("save", async function (this: IUser, next) {
-  // When using select:false, `this.password` is present on newly created docs
-  // and on docs loaded with .select('+password')
+  // Assign permissions based on role if permissions are empty or role has changed
+  if (this.isModified("role") || this.permissions.length === 0) {
+    const rolePermissions = getRolePermissions(this.role);
+    // Merge role permissions with any additional custom permissions
+    const customPermissions = this.permissions.filter(
+      (p) => !rolePermissions.includes(p as any)
+    );
+    this.permissions = [...rolePermissions, ...customPermissions];
+  }
+
+  // Hash password if modified
   if (!this.isModified("password")) return next();
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password!, salt);

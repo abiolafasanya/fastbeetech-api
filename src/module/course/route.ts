@@ -1,0 +1,84 @@
+import { Router } from "express";
+import { authenticate, authorize } from "../../common/middleware/auth";
+import { CourseController } from "./controller";
+
+export default function (router: Router) {
+  // Public routes
+  router.get("/courses", CourseController.findAll);
+  router.get("/courses/:slugOrId", CourseController.findOne);
+  router.get("/courses/:id/reviews", CourseController.getReviews);
+  router.get("/categories", CourseController.getCategories);
+  router.get("/instructors", CourseController.getInstructors);
+
+  // Authenticated user routes
+  router.post("/courses/:id/enroll", authenticate, CourseController.enroll);
+  router.post("/courses/:id/unenroll", authenticate, CourseController.unenroll);
+  router.put(
+    "/courses/:id/progress",
+    authenticate,
+    CourseController.updateProgress
+  );
+  router.post(
+    "/courses/:id/quiz/:quizId/attempt",
+    authenticate,
+    CourseController.submitQuiz
+  );
+  router.get(
+    "/courses/:id/progress",
+    authenticate,
+    CourseController.getProgress
+  );
+  router.post("/courses/:id/review", authenticate, CourseController.addReview);
+  router.put(
+    "/reviews/:reviewId/helpful",
+    authenticate,
+    CourseController.markReviewHelpful
+  );
+  router.get("/my-courses", authenticate, CourseController.getMyCourses);
+
+  // Instructor/Author routes
+  router.post(
+    "/courses",
+    authenticate,
+    authorize("admin", "author"),
+    CourseController.create
+  );
+  router.put(
+    "/courses/:id",
+    authenticate,
+    authorize("admin", "author"),
+    CourseController.update
+  );
+  router.delete(
+    "/courses/:id",
+    authenticate,
+    authorize("admin", "author"),
+    CourseController.delete
+  );
+  router.get(
+    "/courses/:id/analytics",
+    authenticate,
+    authorize("admin", "author"),
+    CourseController.getAnalytics
+  );
+
+  // Admin only routes
+  router.patch(
+    "/courses/:id/publish",
+    authenticate,
+    authorize("admin"),
+    CourseController.publish
+  );
+  router.get(
+    "/admin/courses",
+    authenticate,
+    authorize("admin"),
+    CourseController.getAllCourses
+  );
+  router.post(
+    "/admin/courses/bulk",
+    authenticate,
+    authorize("admin"),
+    CourseController.bulkUpdate
+  );
+}
