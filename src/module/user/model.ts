@@ -12,8 +12,14 @@ export interface IUser extends Document {
   // password can be omitted from query results, so mark optional for TS when not selected
   password?: string;
   phone?: string;
-  role: UserRole;
+  // Backwards compatible single role (legacy). Prefer `roles` for multi-role support.
+  role?: UserRole;
+  // Roles (new): support multiple roles per user
+  roles?: Types.ObjectId[];
+  // Effective permissions stored on user (computed from roles + extraPermissions)
   permissions: string[];
+  // Additional per-user grants (not role-based)
+  extraPermissions?: string[];
   avatar?: string;
   listings: mongoose.Types.ObjectId[];
 
@@ -63,7 +69,12 @@ const UserSchema: Schema<IUser> = new Schema(
       default: "user",
       index: true,
     },
-    permissions: { type: [String], default: [] },
+    // New multi-role support
+    roles: [{ type: Schema.Types.ObjectId, ref: "Role" }],
+    // Effective permissions cached on the user document
+    permissions: [{ type: String }],
+    // Extra per-user permissions (grants)
+    extraPermissions: [{ type: String }],
 
     avatar: { type: String },
     phone: { type: String, trim: true },
@@ -127,14 +138,39 @@ UserSchema.methods.hasAllPermissions = function (
 
 // Pre-save middleware to assign role-based permissions
 UserSchema.pre("save", async function (this: IUser, next) {
-  // Assign permissions based on role if permissions are empty or role has changed
-  if (this.isModified("role") || this.permissions.length === 0) {
-    const rolePermissions = getRolePermissions(this.role);
-    // Merge role permissions with any additional custom permissions
-    const customPermissions = this.permissions.filter(
-      (p) => !rolePermissions.includes(p as any)
-    );
-    this.permissions = [...rolePermissions, ...customPermissions];
+  // Compute effective permissions from either legacy single `role` or new `roles` array
+  try {
+    let computedPermissions: string[] = [];
+
+    // If roles array present, populate permissions from Role documents
+    if (this.roles && this.roles.length > 0) {
+      // Resolve Role model lazily to avoid circular imports
+      const { Role } = await import("../role/model.js");
+      const roles = await Role.find({ _id: { $in: this.roles } }).lean();
+      roles.forEach((r: any) => {
+        if (Array.isArray(r.permissions))
+          r.permissions.forEach((p: string) => computedPermissions.push(p));
+      });
+    } else if (this.role) {
+      // Fallback: legacy single role
+      const rolePermissions = getRolePermissions(this.role);
+      computedPermissions = [...rolePermissions];
+    }
+
+    // Merge extraPermissions and any manually set permissions (dedupe)
+    const extras = Array.isArray(this.extraPermissions)
+      ? this.extraPermissions
+      : [];
+    const manual = Array.isArray(this.permissions) ? this.permissions : [];
+
+    const permissionSet = new Set<string>([
+      ...computedPermissions,
+      ...extras,
+      ...manual,
+    ]);
+    this.permissions = Array.from(permissionSet);
+  } catch (err) {
+    return next(err as any);
   }
 
   // Hash password if modified

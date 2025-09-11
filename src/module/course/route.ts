@@ -1,6 +1,10 @@
 import { Router } from "express";
-import { authenticate, authorize } from "../../common/middleware/auth";
 import { CourseController } from "./controller";
+import { authenticate, authorize } from "../../common/middleware/auth";
+import {
+  requirePermission,
+  requireAnyPermission,
+} from "../../common/middleware/permission";
 
 export default function (router: Router) {
   // Public routes
@@ -36,17 +40,21 @@ export default function (router: Router) {
   );
   router.get("/my-courses", authenticate, CourseController.getMyCourses);
 
-  // Instructor/Author routes
+  // Instructor/Author routes - using new permission system
   router.post(
     "/courses",
     authenticate,
-    authorize("admin", "author"),
+    requireAnyPermission(["course:create", "course:manage_all"]),
     CourseController.create
   );
   router.put(
     "/courses/:id",
     authenticate,
-    authorize("admin", "author"),
+    requireAnyPermission([
+      "course:edit",
+      "course:manage_all",
+      "course:manage_own",
+    ]),
     CourseController.update
   );
   router.delete(
@@ -60,6 +68,22 @@ export default function (router: Router) {
     authenticate,
     authorize("admin", "author"),
     CourseController.getAnalytics
+  );
+
+  // Instructor dashboard - list own courses (including drafts)
+  router.get(
+    "/dashboard/courses",
+    authenticate,
+    authorize("admin", "author"),
+    CourseController.getInstructorCourses
+  );
+
+  // Instructor dashboard - get single course (including drafts)
+  router.get(
+    "/dashboard/courses/:slugOrId",
+    authenticate,
+    authorize("admin", "author"),
+    CourseController.getInstructorCourse
   );
 
   // Admin only routes

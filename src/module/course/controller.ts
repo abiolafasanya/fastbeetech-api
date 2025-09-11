@@ -90,7 +90,7 @@ export class CourseController {
 
     // Try to find by slug first, then by ID
     let course;
-    if (mongoose.Types.ObjectId.isValid(slugOrId)) {
+    if (mongoose.isValidObjectId(slugOrId)) {
       course = await CourseService.getCourseWithEnrollmentStatus(
         slugOrId,
         userId
@@ -117,8 +117,10 @@ export class CourseController {
     const isOwnerOrAdmin =
       user &&
       (user.role === "admin" ||
-        course.instructor._id.toString() === user.id ||
-        course.coInstructors?.some((co: any) => co._id.toString() === user.id));
+        (course.instructor as any)._id?.toString() === user.id ||
+        course.coInstructors?.some(
+          (co: any) => co._id?.toString() === user.id
+        ));
 
     if (course.status !== "published" && !isOwnerOrAdmin) {
       return res.status(404).json({
@@ -487,18 +489,18 @@ export class CourseController {
       });
     }
 
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-    const isAlreadyHelpful = review.helpfulByUsers.some((id) =>
-      id.equals(userObjectId)
+    const userObjectId = userId;
+    const isAlreadyHelpful = review.helpfulByUsers.some(
+      (id) => id.toString() === userObjectId.toString()
     );
 
     if (validatedData.helpful && !isAlreadyHelpful) {
       review.helpful += 1;
-      review.helpfulByUsers.push(userObjectId);
+      review.helpfulByUsers.push(userObjectId as any);
     } else if (!validatedData.helpful && isAlreadyHelpful) {
       review.helpful -= 1;
       review.helpfulByUsers = review.helpfulByUsers.filter(
-        (id) => !id.equals(userObjectId)
+        (id) => id.toString() !== userObjectId.toString()
       );
     }
 
@@ -591,6 +593,106 @@ export class CourseController {
       },
     });
   });
+
+  /**
+   * GET /dashboard/courses - Get courses for the authenticated instructor/author (includes drafts)
+   */
+  static getInstructorCourses = catchAsync(
+    async (req: Request, res: Response) => {
+      const userId = (req as any).user.id;
+      // Normalize and coerce paging params
+      const rawQuery = req.query as Record<string, any>;
+      const pageNum = rawQuery.page ? Number(rawQuery.page) || 1 : 1;
+      const limitNum = rawQuery.limit ? Number(rawQuery.limit) || 10 : 10;
+
+      // Base filter: instructor is user OR coInstructors includes user
+      const baseFilter: any = {
+        $or: [{ instructor: userId }, { coInstructors: userId }],
+      };
+
+      // Optional status filter (draft, published, archived, all)
+      if (rawQuery.status && rawQuery.status !== "all") {
+        baseFilter.status = rawQuery.status;
+      }
+
+      // Optional search
+      if (rawQuery.search) {
+        const searchRegex = { $regex: rawQuery.search, $options: "i" };
+        // Ensure both instructor filter and search are applied
+        baseFilter.$and = [
+          { $or: [{ title: searchRegex }, { description: searchRegex }] },
+        ];
+      }
+
+      const courses = await Course.find(baseFilter)
+        .populate("instructor", "name email avatar")
+        .sort({ createdAt: -1 })
+        .limit(limitNum)
+        .skip((pageNum - 1) * limitNum);
+
+      const total = await Course.countDocuments(baseFilter);
+
+      return res.json({
+        status: true,
+        message: "Instructor courses retrieved successfully",
+        data: {
+          courses,
+          pagination: {
+            currentPage: pageNum,
+            totalPages: Math.ceil(total / limitNum),
+            totalItems: total,
+          },
+        },
+      });
+    }
+  );
+
+  /**
+   * GET /dashboard/courses/:slugOrId - Get single course for the authenticated instructor/author (includes drafts)
+   */
+  static getInstructorCourse = catchAsync(
+    async (req: Request, res: Response) => {
+      const { slugOrId } = req.params;
+      const userId = (req as any).user.id;
+      const userRole = (req as any).user.role;
+
+      // Build query - admins can see all courses, instructors only see their own
+      const query: any = {
+        $or: [
+          { slug: slugOrId },
+          { _id: mongoose.Types.ObjectId.isValid(slugOrId) ? slugOrId : null },
+        ].filter(Boolean),
+      };
+
+      // If not admin, restrict to own courses
+      if (userRole !== "admin") {
+        query.instructor = userId;
+      }
+
+      const course = await Course.findOne(query)
+        .populate({
+          path: "instructor",
+          select: "name email avatar",
+        })
+        .populate({
+          path: "coInstructors",
+          select: "name email avatar",
+        });
+
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: "Course not found or you don't have permission to view it",
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Course retrieved successfully",
+        data: { course },
+      });
+    }
+  );
 
   /**
    * GET /courses/:id/analytics - Get course analytics (Instructor/Admin)

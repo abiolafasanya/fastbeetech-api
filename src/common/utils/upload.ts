@@ -4,7 +4,7 @@ import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
 import { Request, Response } from "express";
 import fs from "fs";
-import path from "path";
+import { logger } from "../middleware/logger";
 
 /* ----------------------------
    1. CLOUDINARY CONFIGURATION
@@ -25,7 +25,7 @@ const upload = multer({ dest: "uploads/" });
 ---------------------------- */
 export const uploadToCloudinary = async (
   filePath: string,
-  folder = "listings"
+  folder = "hexonest"
 ) => {
   try {
     const result = await cloudinary.uploader.upload(filePath, {
@@ -34,6 +34,7 @@ export const uploadToCloudinary = async (
     fs.unlinkSync(filePath); // remove temp file
     return result.secure_url;
   } catch (err) {
+    logger.error("Cloudinary Upload Error", err);
     throw new Error("Cloudinary Upload Failed");
   }
 };
@@ -77,4 +78,3 @@ export const uploadMultipleImagesHandler = [
     }
   },
 ];
-

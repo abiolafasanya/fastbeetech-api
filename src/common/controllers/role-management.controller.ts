@@ -283,7 +283,7 @@ export class RoleManagementController {
       }
 
       const validation = RoleManagementService.validateRoleTransition(
-        user.role,
+        user.role || "student",
         newRole,
         assignerRole
       );

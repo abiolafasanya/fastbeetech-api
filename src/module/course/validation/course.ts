@@ -190,8 +190,8 @@ export const courseSearchSchema = z.object({
 // Course Analytics Validation
 export const courseAnalyticsSchema = z.object({
   courseId: z.string().length(24, "Invalid course ID"),
-  dateFrom: z.string().datetime().optional(),
-  dateTo: z.string().datetime().optional(),
+  dateFrom: z.iso.date().optional(),
+  dateTo: z.iso.date().optional(),
   granularity: z.enum(["day", "week", "month"]).default("day"),
 });
 

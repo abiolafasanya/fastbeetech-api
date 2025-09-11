@@ -53,7 +53,7 @@ export class BlogPostController {
     }
     post.shares += 1;
     post.sharesByUser.push({
-      user: new mongoose.Types.ObjectId(userId),
+      user: userId as any,
       sharedAt: new Date(),
     });
     await post.save();
@@ -346,7 +346,7 @@ export class BlogPostController {
       prev.type = type;
     } else {
       post.reactionsByUser.push({
-        user: new mongoose.Types.ObjectId(userId),
+        user: userId as any,
         type,
       });
     }
@@ -489,7 +489,7 @@ export class BlogPostController {
     if (!post) return res.status(404).json({ message: "Post not found" });
 
     const comments = (post.comments || []).filter(
-      (c) => c.status === "approved"
+      (c: any) => c.status === "approved"
     );
     return res.json({ status: true, data: comments });
   });

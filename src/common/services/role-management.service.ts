@@ -29,12 +29,12 @@ export class RoleManagementService {
     }
 
     // Check if assigner can manage the target user's role
-    if (!canManageUser(assigner.role, user.role)) {
+    if (!canManageUser(assigner.role || "student", user.role || "student")) {
       throw new Error("Insufficient privileges to change user role");
     }
 
     // Check if assigner can assign the new role
-    if (!canManageUser(assigner.role, newRole)) {
+    if (!canManageUser(assigner.role || "student", newRole)) {
       throw new Error("Cannot assign role higher than or equal to your own");
     }
 
@@ -64,7 +64,7 @@ export class RoleManagementService {
     }
 
     // Only admins and super-admins can assign custom permissions
-    if (!["admin", "super-admin"].includes(assigner.role)) {
+    if (!["admin", "super-admin"].includes(assigner.role || "student")) {
       throw new Error("Only admins can assign custom permissions");
     }
 
@@ -94,12 +94,12 @@ export class RoleManagementService {
       throw new Error("Remover not found");
     }
 
-    if (!["admin", "super-admin"].includes(remover.role)) {
+    if (!["admin", "super-admin"].includes(remover.role || "student")) {
       throw new Error("Only admins can remove custom permissions");
     }
 
     // Remove specified permissions
-    const rolePermissions = getRolePermissions(user.role);
+    const rolePermissions = getRolePermissions(user.role || "student");
     user.permissions = user.permissions.filter(
       (permission) =>
         !permissions.includes(permission as Permission) ||
@@ -126,11 +126,11 @@ export class RoleManagementService {
       throw new Error("Resetter not found");
     }
 
-    if (!canManageUser(resetter.role, user.role)) {
+    if (!canManageUser(resetter.role || "student", user.role || "student")) {
       throw new Error("Insufficient privileges to reset user permissions");
     }
 
-    user.permissions = getRolePermissions(user.role);
+    user.permissions = getRolePermissions(user.role || "student");
     await user.save();
   }
 
@@ -171,7 +171,7 @@ export class RoleManagementService {
     // Filter out users with higher roles than the requester (for security)
     return users.filter(
       (user) =>
-        canManageUser(requester.role, user.role as UserRole) ||
+        canManageUser(requester.role || "student", user.role as UserRole) ||
         user._id.toString() === requestedBy
     );
   }
@@ -192,7 +192,7 @@ export class RoleManagementService {
       throw new Error("Assigner not found");
     }
 
-    if (!["admin", "super-admin"].includes(assigner.role)) {
+    if (!["admin", "super-admin"].includes(assigner.role || "student")) {
       throw new Error("Only admins can perform bulk role assignments");
     }
 
@@ -272,7 +272,7 @@ export class RoleManagementService {
       throw new Error("Insufficient permissions to view user permissions");
     }
 
-    const rolePermissions = getRolePermissions(user.role);
+    const rolePermissions = getRolePermissions(user.role || "student");
     const customPermissions = user.permissions.filter(
       (p) => !rolePermissions.includes(p as Permission)
     );

@@ -5,6 +5,7 @@ import { authenticate } from "./common/middleware/auth";
 import BlogRoute from "./module/blog/route";
 import AnalyticsRoute from "./module/analytics/route";
 import CourseRoute from "./module/course/route";
+import UserPermissionsRoute from "./common/routes/user-permissions.route";
 import {
   uploadImageHandler,
   uploadMultipleImagesHandler,
@@ -24,4 +25,7 @@ export default function (router: Router) {
   BlogRoute(router);
   AnalyticsRoute(router);
   CourseRoute(router);
+
+  // User permissions routes
+  router.use("/me/permissions", UserPermissionsRoute);
 }

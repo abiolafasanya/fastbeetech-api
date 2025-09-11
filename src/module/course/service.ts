@@ -222,20 +222,20 @@ export class CourseService {
       throw new Error("User not enrolled in this course");
     }
 
-    const contentObjectId = new mongoose.Types.ObjectId(contentId);
+    const contentObjectId = contentId;
 
     if (completed) {
       // Add to completed if not already there
       if (
-        !enrollment.progress.completedContents.some((id) =>
-          id.equals(contentObjectId)
+        !enrollment.progress.completedContents.some(
+          (id) => id.toString() === contentObjectId.toString()
         )
       ) {
-        enrollment.progress.completedContents.push(contentObjectId);
+        enrollment.progress.completedContents.push(contentObjectId as any);
       }
 
       // Update last accessed content
-      enrollment.progress.lastAccessedContent = contentObjectId;
+      enrollment.progress.lastAccessedContent = contentObjectId as any;
 
       // Update status to in-progress if still enrolled
       if (enrollment.status === "enrolled") {
@@ -245,7 +245,7 @@ export class CourseService {
       // Remove from completed
       enrollment.progress.completedContents =
         enrollment.progress.completedContents.filter(
-          (id) => !id.equals(contentObjectId)
+          (id) => id.toString() !== contentObjectId.toString()
         );
     }
 
@@ -332,7 +332,7 @@ export class CourseService {
 
     if (!quizAttemptRecord) {
       quizAttemptRecord = {
-        quiz: new mongoose.Types.ObjectId(quizId),
+        quiz: quizId as any,
         attempts: [],
       };
       enrollment.quizAttempts.push(quizAttemptRecord);
@@ -383,13 +383,13 @@ export class CourseService {
 
     // If passed and not already in completed quizzes, add it
     if (passed) {
-      const quizObjectId = new mongoose.Types.ObjectId(quizId);
+      const quizObjectId = quizId;
       if (
-        !enrollment.progress.completedQuizzes.some((id) =>
-          id.equals(quizObjectId)
+        !enrollment.progress.completedQuizzes.some(
+          (id) => id.toString() === quizObjectId.toString()
         )
       ) {
-        enrollment.progress.completedQuizzes.push(quizObjectId);
+        enrollment.progress.completedQuizzes.push(quizObjectId as any);
       }
     }
 
@@ -449,7 +449,7 @@ export class CourseService {
    */
   static async updateCourseRatingStats(courseId: string): Promise<void> {
     const stats = await CourseReview.aggregate([
-      { $match: { course: new mongoose.Types.ObjectId(courseId) } },
+      { $match: { course: courseId as any } },
       {
         $group: {
           _id: null,
@@ -482,7 +482,7 @@ export class CourseService {
    */
   static async updateCourseCompletionStats(courseId: string): Promise<void> {
     const stats = await CourseEnrollment.aggregate([
-      { $match: { course: new mongoose.Types.ObjectId(courseId) } },
+      { $match: { course: courseId as any } },
       {
         $group: {
           _id: null,
@@ -523,7 +523,7 @@ export class CourseService {
     dateFrom?: Date,
     dateTo?: Date
   ) {
-    const matchStage: any = { course: new mongoose.Types.ObjectId(courseId) };
+    const matchStage: any = { course: courseId as any };
 
     if (dateFrom || dateTo) {
       matchStage.enrollmentDate = {};
@@ -561,7 +561,7 @@ export class CourseService {
 
     // Get reviews analytics
     const reviewStats = await CourseReview.aggregate([
-      { $match: { course: new mongoose.Types.ObjectId(courseId) } },
+      { $match: { course: courseId as any } },
       {
         $group: {
           _id: null,
@@ -633,7 +633,7 @@ export class CourseService {
     }
 
     if (filters.instructor) {
-      matchStage.instructor = new mongoose.Types.ObjectId(filters.instructor);
+      matchStage.instructor = filters.instructor as any;
     }
 
     if (filters.tags && filters.tags.length > 0) {

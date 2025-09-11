@@ -1,5 +1,6 @@
 import { NextFunction, Request, Response } from "express";
 import jwt, { JwtPayload } from "jsonwebtoken";
+import { User } from "../../module/user/model";
 
 function extractToken(req: Request): string | null {
   // 1) Cookie (httpOnly recommended)
@@ -13,7 +14,7 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-export const authenticate = (
+export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -38,14 +39,23 @@ export const authenticate = (
     // Optional hardening checks (customize as needed)
     // if (!decoded.emailVerified) return res.status(403).json({ message: "Email not verified" });
 
+    // Load user's current permissions from database to ensure they're up-to-date
+    const dbUser = await User.findById(decoded.id);
+
+    const userPermissions = dbUser?.permissions || decoded.permissions || [];
+
     req.user = {
       id: decoded.id,
       email: decoded.email,
       role: decoded.role,
-      permissions: decoded.permissions ?? [],
+      permissions: userPermissions,
       iat: decoded.iat,
       exp: decoded.exp,
-    };
+      // Add hasPermission helper method
+      hasPermission: (permission: string) => {
+        return userPermissions.includes(permission);
+      },
+    } as any;
 
     return next();
   } catch (err) {

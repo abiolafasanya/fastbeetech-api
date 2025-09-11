@@ -1,5 +1,9 @@
 import dotenv from "dotenv";
-dotenv.config();
+if(process.env.NODE_ENV !== "production"){
+  dotenv.config({override: true});
+} else {
+  dotenv.config();
+}
 import express from "express";
 import cors from "cors";
 import routeHandler from "./routes";
