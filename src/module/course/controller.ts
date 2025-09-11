@@ -18,6 +18,7 @@ import {
 import mongoose from "mongoose";
 import { ICourseSearch } from "./validation/course";
 import { error } from "console";
+import { authenticate } from "../../common/middleware/auth";
 
 export class CourseController {
   /**
@@ -81,13 +82,12 @@ export class CourseController {
     });
   });
 
-  /**
+      /**
    * GET /courses/:slugOrId - Get single course by slug or ID
    */
   static findOne = catchAsync(async (req: Request, res: Response) => {
     const { slugOrId } = req.params;
     const userId = (req as any).user?.id;
-
     // Try to find by slug first, then by ID
     let course;
     if (mongoose.isValidObjectId(slugOrId)) {

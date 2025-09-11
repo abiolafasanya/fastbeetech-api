@@ -112,11 +112,9 @@ export class CourseService {
       .populate("instructor", "name email avatar")
       .populate("coInstructors", "name email avatar")
       .lean();
-
     if (!course) {
       throw new Error("Course not found");
     }
-
     let enrollmentStatus;
     let userProgress;
 

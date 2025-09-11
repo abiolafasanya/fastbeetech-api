@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { CourseController } from "./controller";
-import { authenticate, authorize } from "../../common/middleware/auth";
+import {
+  authenticate,
+  authorize,
+  optionalAuth,
+} from "../../common/middleware/auth";
 import {
   requirePermission,
   requireAnyPermission,
@@ -9,7 +13,7 @@ import {
 export default function (router: Router) {
   // Public routes
   router.get("/courses", CourseController.findAll);
-  router.get("/courses/:slugOrId", CourseController.findOne);
+  router.get("/courses/:slugOrId", optionalAuth, CourseController.findOne);
   router.get("/courses/:id/reviews", CourseController.getReviews);
   router.get("/categories", CourseController.getCategories);
   router.get("/instructors", CourseController.getInstructors);

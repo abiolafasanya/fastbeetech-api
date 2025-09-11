@@ -106,3 +106,62 @@ export const adminOnly = (req: Request, res: Response, next: NextFunction) => {
   }
   next();
 };
+
+/**
+ * Optional authentication middleware
+ * Sets req.user if valid token is provided (cookie or Bearer), but doesn't block request if no token
+ * Useful for routes that should work for both authenticated and unauthenticated users
+ */
+export const optionalAuth = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  const token = extractToken(req);
+
+  // If no token, continue without user
+  if (!token) {
+    return next();
+  }
+
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    // Log error but don't block request for optional auth
+    console.error("Server misconfiguration: JWT_SECRET not set");
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, secret) as JwtPayload &
+      Express.UserJwtPayload;
+
+    // Load user's current permissions from database to ensure they're up-to-date
+    const dbUser = await User.findById(decoded.id);
+
+    // If user not found in DB, continue without user
+    if (!dbUser) {
+      return next();
+    }
+
+    const userPermissions = dbUser?.permissions || decoded.permissions || [];
+
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      permissions: userPermissions,
+      iat: decoded.iat,
+      exp: decoded.exp,
+      // Add hasPermission helper method
+      hasPermission: (permission: string) => {
+        return userPermissions.includes(permission);
+      },
+    } as any;
+
+    return next();
+  } catch (err) {
+    // If token is invalid, just continue without user instead of blocking
+    console.log("Invalid token in optional auth:", err);
+    return next();
+  }
+};
