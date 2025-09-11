@@ -6,10 +6,10 @@ import {
 } from "../controllers/user-permissions.controller";
 import { authenticate } from "../middleware/auth";
 
-const router = Router();
+export default function userPermissionsRoutes(router: Router) {
 
-// All routes require authentication
-router.use(authenticate);
+  // All routes require authentication
+  router.use(authenticate);
 
 /**
  * @route GET /api/v1/me/permissions
@@ -32,4 +32,5 @@ router.post("/check", checkUserPermission);
  */
 router.post("/check-any", checkUserAnyPermissions);
 
-export default router;
+}
+

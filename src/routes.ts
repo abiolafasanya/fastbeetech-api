@@ -5,12 +5,13 @@ import { authenticate } from "./common/middleware/auth";
 import BlogRoute from "./module/blog/route";
 import AnalyticsRoute from "./module/analytics/route";
 import CourseRoute from "./module/course/route";
-import UserPermissionsRoute from "./common/routes/user-permissions.route";
 import {
   uploadImageHandler,
   uploadMultipleImagesHandler,
 } from "./common/utils/upload";
 import AuthRoute from "./module/user/route";
+import roleManagementRoutes from "./common/routes/role-management.routes";
+import userPermissionsRoutes from "./common/routes/user-permissions.route";
 export default function (router: Router) {
   router.get("/", (req, res) => {
     res.json({ status: "success", message: "Health Check" });
@@ -25,7 +26,10 @@ export default function (router: Router) {
   BlogRoute(router);
   AnalyticsRoute(router);
   CourseRoute(router);
+  roleManagementRoutes(router);
 
-  // User permissions routes
-  router.use("/me/permissions", UserPermissionsRoute);
+  // User permissions routes - create sub-router
+  const permissionsRouter = Router();
+  userPermissionsRoutes(permissionsRouter);
+  router.use("/me/permissions", permissionsRouter);
 }

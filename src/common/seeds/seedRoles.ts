@@ -22,19 +22,19 @@ export async function seedRoles() {
 }
 
 // When run directly, connect to DB using MONGO_URI env
-if (require.main === module) {
-  const MONGO_URI =
-    process.env.MONGO_URI ||
-    process.env.MONGODB_URI ||
-    "mongodb://localhost:27017/fastbeetech";
-  mongoose
-    .connect(MONGO_URI)
-    .then(async () => {
-      await seedRoles();
-      process.exit(0);
-    })
-    .catch((err) => {
-      logger.error("Failed to seed roles", err as any);
-      process.exit(1);
-    });
-}
+// if (require.main === module) {
+//   const MONGO_URI =
+//     process.env.MONGO_URI ||
+//     process.env.MONGODB_URI ||
+//     "mongodb://localhost:27017/fastbeetech";
+//   mongoose
+//     .connect(MONGO_URI)
+//     .then(async () => {
+//       await seedRoles();
+//       process.exit(0);
+//     })
+//     .catch((err) => {
+//       logger.error("Failed to seed roles", err as any);
+//       process.exit(1);
+//     });
+// }

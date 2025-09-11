@@ -311,4 +311,75 @@ export class RoleManagementController {
       });
     }
   }
+
+  /**
+   * TEMPORARY: Make current user super admin
+   * POST /api/admin/make-me-super-admin
+   * WARNING: This is a temporary endpoint for development - REMOVE IN PRODUCTION
+   */
+  static async makeMeSuperAdmin(req: Request, res: Response) {
+    try {
+      const userId = req.user!.id;
+
+      // Update user to super admin role with all permissions
+      await User.findByIdAndUpdate(userId, {
+        role: "super-admin",
+        permissions: [
+          // Blog permissions
+          "blog:create",
+          "blog:read",
+          "blog:update",
+          "blog:delete",
+          "blog:publish",
+          // Course permissions
+          "course:create",
+          "course:read",
+          "course:update",
+          "course:delete",
+          "course:publish",
+          // User management permissions
+          "user:create",
+          "user:read",
+          "user:update",
+          "user:delete",
+          "user:manage",
+          "user:manage_roles",
+          "user:manage_permissions",
+          // Comment permissions
+          "comment:create",
+          "comment:read",
+          "comment:update",
+          "comment:delete",
+          "comment:moderate",
+          // Analytics permissions
+          "analytics:read",
+          "analytics:export",
+          // System permissions
+          "system:admin",
+          "system:backup",
+          "system:restore",
+          // Internship permissions
+          "internship:create",
+          "internship:read",
+          "internship:update",
+          "internship:delete",
+          "internship:manage",
+        ],
+      });
+
+      res.json({
+        status: true,
+        message:
+          "🚀 You are now a super admin with all permissions! Remember to remove this endpoint in production.",
+        role: "super-admin",
+        warning: "⚠️ This is a temporary development endpoint",
+      });
+    } catch (error) {
+      res.status(500).json({
+        status: false,
+        message:
+          error instanceof Error ? error.message : "Failed to make super admin",
+      });
+    }
+  }
 }

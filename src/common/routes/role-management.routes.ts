@@ -80,4 +80,11 @@ export default function roleManagementRoutes(router: Router) {
     requireUserManagement,
     RoleManagementController.validateRoleTransition
   );
+
+  // TEMPORARY: Make current user super admin (REMOVE IN PRODUCTION)
+  // router.post(
+  //   "/admin/make-me-super-admin",
+  //   authenticate, // Only requires authentication
+  //   RoleManagementController.makeMeSuperAdmin
+  // );
 }
