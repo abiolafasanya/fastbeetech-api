@@ -11,7 +11,9 @@ import {
 } from "./common/utils/upload";
 import AuthRoute from "./module/user/route";
 import roleManagementRoutes from "./common/routes/role-management.routes";
+import userManagementRoutes from "./common/routes/user-management.routes";
 import userPermissionsRoutes from "./common/routes/user-permissions.route";
+import featuresRoutes from "./common/routes/features.routes";
 export default function (router: Router) {
   router.get("/", (req, res) => {
     res.json({ status: "success", message: "Health Check" });
@@ -27,6 +29,8 @@ export default function (router: Router) {
   AnalyticsRoute(router);
   CourseRoute(router);
   roleManagementRoutes(router);
+  userManagementRoutes(router);
+  featuresRoutes(router);
 
   // User permissions routes - create sub-router
   const permissionsRouter = Router();

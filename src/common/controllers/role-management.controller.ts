@@ -239,10 +239,11 @@ export class RoleManagementController {
     try {
       const { userId } = req.params;
       const requestedBy = req.user!.id;
-
+      
       const analysis = await RoleManagementService.getPermissionAnalysis(
         userId,
-        requestedBy
+        requestedBy,
+        req.user?.role === "super-admin" || req.user?.role === "admin"
       );
 
       res.json({

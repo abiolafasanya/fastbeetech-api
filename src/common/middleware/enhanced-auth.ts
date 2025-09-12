@@ -23,7 +23,7 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-export const authenticate = (
+export const authenticate = async (
   req: Request,
   res: Response,
   next: NextFunction
@@ -44,11 +44,18 @@ export const authenticate = (
     const decoded = jwt.verify(token, secret) as JwtPayload &
       Express.UserJwtPayload;
 
+    // Load latest role/permissions from DB to avoid stale JWT data
+    const dbUser = await User.findById(decoded.id).select("role permissions");
+
+    const effectivePermissions =
+      dbUser?.permissions ?? decoded.permissions ?? [];
+    const effectiveRole = (dbUser?.role as any) ?? decoded.role;
+
     req.user = {
       id: decoded.id,
       email: decoded.email,
-      role: decoded.role,
-      permissions: decoded.permissions ?? [],
+      role: effectiveRole,
+      permissions: effectivePermissions,
       iat: decoded.iat,
       exp: decoded.exp,
     };
@@ -86,6 +93,8 @@ export const authorize =
 export const requirePermissions =
   (...required: Permission[]) =>
   (req: Request, res: Response, next: NextFunction) => {
+    // Super-admin bypasses fine-grained permission checks
+    if (req.user?.role === "super-admin") return next();
     const userPermissions = req.user?.permissions ?? [];
     const missing = required.filter((p) => !userPermissions.includes(p));
     if (missing.length) {
@@ -105,12 +114,16 @@ export const requirePermissions =
 export const requireAnyPermission =
   (...permissions: Permission[]) =>
   (req: Request, res: Response, next: NextFunction) => {
+    // Super-admin bypasses fine-grained permission checks
+    if (req.user?.role === "super-admin") return next();
     const userPermissions = req.user?.permissions ?? [];
 
     if (!hasAnyPermission(userPermissions, permissions)) {
       return res.status(403).json({
-        message: "Forbidden: insufficient permissions",
+        message:
+          "Forbidden: insufficient permissions (need any one of the listed permissions)",
         required: permissions,
+        mode: "any",
       });
     }
     return next();

@@ -260,7 +260,7 @@ export class RoleManagementService {
   /**
    * Get permission analysis for a user
    */
-  static async getPermissionAnalysis(userId: string, requestedBy: string) {
+  static async getPermissionAnalysis(userId: string, requestedBy: string, isAdmin?: boolean) {
     const user = await User.findById(userId).select("role permissions");
     const requester = await User.findById(requestedBy);
 
@@ -268,7 +268,7 @@ export class RoleManagementService {
       throw new Error("User not found");
     }
 
-    if (userId !== requestedBy && !requester.hasPermission("user:view")) {
+    if (!isAdmin && userId !== requestedBy && !requester.hasPermission("user:view")) {
       throw new Error("Insufficient permissions to view user permissions");
     }
 
