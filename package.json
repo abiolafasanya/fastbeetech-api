@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "preview:email": "ts-node-dev --respawn --transpile-only scripts/preview-internship-email.tsx",
     "seed:roles": "npm run build && node dist/common/seeds/seedRoles.js",
     "seed:roles:simple": "node seedRolesSimple.js",
     "build": "tsc",

@@ -1,8 +1,7 @@
 import dotenv from "dotenv";
 if (process.env.NODE_ENV !== "production") {
   dotenv.config({ path: ".env", override: true });
-  console.log("key", process.env.IVORYPAY_SECRET_KEY);
-  console.log("database_url", process.env.MONGO_URI);
+  // console.log("key", process.env.IVORYPAY_SECRET_KEY);
 } else {
   dotenv.config();
 }

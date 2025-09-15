@@ -4,8 +4,9 @@ import * as InternshipService from "./service";
 import { paginate } from "../../common/utils/pagination";
 import catchAsync from "../../shared/request";
 import schema from "./validation/internship";
-import { da } from "zod/v4/locales";
 import { BadRequestException, NotFoundException } from "../../common/middleware/errors";
+import { sendEmail } from "../../common/utils/sendEmail";
+import logger from "../../common/middleware/logger";
 
 export const InternshipController = {
   // List all internship applications with pagination and search
@@ -31,12 +32,16 @@ export const InternshipController = {
     const { id } = req.params;
     const app = await InternApplication.findById(id);
     if (!app) return res.status(404).json({ error: "Application not found" });
-    const send = await InternshipService.sendConfirmationMail(
-      app.email,
-      app.name,
-      app.status
-    );
-    console.log("Mail send result:", send);
+    await sendEmail({
+      to: app.email,
+      type: "internship-status",
+      data: { name: app.name, status: app.status },
+    }).then((data) => {
+      logger.info("Internship status email sent successfully", data);
+    }).catch((err) => {
+      logger.error("Failed to send internship status email:", err);
+    });
+
     return res.json({ success: true, message: "Confirmation mail sent" });
   }),
   // List all internship applications with pagination and search

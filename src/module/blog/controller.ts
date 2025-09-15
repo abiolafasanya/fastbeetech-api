@@ -74,12 +74,22 @@ export class BlogPostController {
       to,
     } = req.query as Record<string, string>;
 
-    const isAdmin = (req as any).user?.role === "admin";
+    // Determine access: admins/super-admins or users with blog:manage_all
+    const user = (req as any).user;
+    const userPermissions: string[] = user?.permissions ?? [];
+    const role: string | undefined = user?.role;
+
+    const canManageAll =
+      role === "admin" ||
+      role === "super-admin" ||
+      userPermissions.includes("blog:manage_all");
+    const canManageOwn = userPermissions.includes("blog:manage_own");
 
     const filter: any = { isDeleted: false };
 
-    if (isAdmin && status) filter.status = status;
-    if (!isAdmin) filter.status = "published";
+    // If caller can manage all, allow passing explicit status, otherwise default to published
+    if (canManageAll && status) filter.status = status;
+    if (!canManageAll) filter.status = "published";
 
     if (tag)
       filter.tags = { $in: tag.split(",").map((s) => s.trim().toLowerCase()) };
@@ -129,12 +139,31 @@ export class BlogPostController {
       to,
     } = req.query as Record<string, string>;
 
-    const isAdmin = (req as any).user?.role === "admin";
+    // admin posts listing for dashboard: allow admins, super-admins, blog:manage_all and authors (manage_own for own drafts)
+    const user = (req as any).user;
+    const userPermissions: string[] = user?.permissions ?? [];
+    const role: string | undefined = user?.role;
+
+    const canManageAll =
+      role === "admin" ||
+      role === "super-admin" ||
+      userPermissions.includes("blog:manage_all");
+    const canManageOwn = userPermissions.includes("blog:manage_own");
 
     const filter: any = { isDeleted: false };
 
-    if (isAdmin && status) filter.status = status;
-    if (!isAdmin) filter.status = "published";
+    // Allow admins/manage_all users to filter by status; others default to published
+    if (canManageAll && status) filter.status = status;
+    if (!canManageAll) filter.status = "published";
+
+    // If user can only manage own posts, limit to their author id (but still allow drafts)
+    if (!canManageAll && canManageOwn && user?.id) {
+      filter.$or = [{ author: user.id }, { status: "published" }];
+      // If status was explicitly requested and is 'draft' or similar, apply it for own posts
+      if (status && status !== "published") {
+        filter.$or = [{ author: user.id, status }, { status: "published" }];
+      }
+    }
 
     if (tag)
       filter.tags = { $in: tag.split(",").map((s) => s.trim().toLowerCase()) };
@@ -172,9 +201,28 @@ export class BlogPostController {
 
   // GET /posts/:slug (public)
   static findOne = catchAsync(async (req: Request, res: Response) => {
-    const isAdmin = (req as any).user?.role === "admin";
+    const user = (req as any).user;
+    const userPermissions: string[] = user?.permissions ?? [];
+    const role: string | undefined = user?.role;
+
+    const canManageAll =
+      role === "admin" ||
+      role === "super-admin" ||
+      userPermissions.includes("blog:manage_all");
+    const canManageOwn = userPermissions.includes("blog:manage_own");
+
     const filter: any = { slug: req.params.slug, isDeleted: false };
-    if (!isAdmin) filter.status = "published";
+    if (!canManageAll) {
+      // If user can manage own posts, allow them to view their own drafts
+      if (canManageOwn && user?.id) {
+        filter.$or = [
+          { slug: req.params.slug, status: "published" },
+          { slug: req.params.slug, author: user.id },
+        ];
+      } else {
+        filter.status = "published";
+      }
+    }
 
     const post = await BlogPost.findOne(filter)
       .populate("author", "name avatar")

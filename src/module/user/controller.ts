@@ -8,6 +8,7 @@ import {
 } from "../../common/middleware/errors";
 import { sendEmail } from "../../common/utils/sendEmail";
 import { signAuthToken } from "../../common/utils/authToken";
+import logger from "../../common/middleware/logger";
 
 class AuthController {
   register = async (req: Request, res: Response) => {
@@ -118,6 +119,8 @@ class AuthController {
       to: user.email,
       type: "onboarding",
       data: { name: user.name },
+    }).catch((err) => {
+      logger.error("Failed to send onboarding email:", err);
     });
 
     res.json({ message: "Email verified successfully" });
@@ -248,6 +251,12 @@ class AuthController {
       to: user.email,
       type: "reset-password",
       data: { resetUrl },
+    }).then((data) => {
+      logger.log("info", `Password reset email sent to ${user.email}`);
+      logger.log("info", `Email data: ${JSON.stringify(data)}`);
+    })
+    .catch((err) => {
+      logger.error("Failed to send password reset email:", err);
     });
 
     res.json({ message: "Password reset link sent." });

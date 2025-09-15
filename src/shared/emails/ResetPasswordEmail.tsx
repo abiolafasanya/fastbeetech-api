@@ -12,7 +12,7 @@ export const ResetPasswordEmail = ({ resetUrl }: { resetUrl: string }) => (
     <Link
       href={resetUrl}
       style={{
-        background: "#ef4444",
+        background: "#2563eb",
         color: "#fff",
         padding: "12px 20px",
         borderRadius: "6px",

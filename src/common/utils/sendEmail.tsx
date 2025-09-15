@@ -9,7 +9,7 @@ import { OnboardingEmail } from "../../shared/emails/OnboardingEmail";
 import { VerifyEmail } from "../../shared/emails/VerifyEmail";
 import { ResetPasswordEmail } from "../../shared/emails/ResetPasswordEmail";
 import { PhoneVerificationEmail } from "../../shared/emails/PhoneVerificationEmail";
-import { StoreCreatedEmail } from "../../shared/emails/StoreCreatedEmail";
+import InternshipStatusEmail from "../../shared/emails/InternshipStatusEmail";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -21,7 +21,7 @@ interface EmailOptions {
     | "verify"
     | "reset-password"
     | "phone-verification"
-    | "store-created";
+    | "internship-status";
   data: any;
 }
 
@@ -34,7 +34,7 @@ export async function sendEmail({ to, type, data }: EmailOptions) {
     switch (type) {
       case "onboarding":
         html = await render(<OnboardingEmail name={data.name} />);
-        subject = "Welcome to Marketplace!";
+        subject = "Welcome to Hexonest!";
         break;
         case "verify":
           html = await render(
@@ -53,14 +53,15 @@ export async function sendEmail({ to, type, data }: EmailOptions) {
         html = await render(<PhoneVerificationEmail code={data.code} />);
         subject = "Your Phone Verification Code";
         break;
-      case "store-created":
+      case "internship-status":
         html = await render(
-          <StoreCreatedEmail
-            storeName={data.storeName}
-            dashboardUrl={data.dashboardUrl}
+          <InternshipStatusEmail
+            name={data.name}
+            status={data.status}
           />
         );
-        subject = "Your Store Has Been Created!";
+        subject = `Your Internship Application Status: ${data.status}`;
+        break;
         break;
         default:
           throw new Error(`Unsupported email type: ${type}`);
@@ -68,11 +69,11 @@ export async function sendEmail({ to, type, data }: EmailOptions) {
         console.log("Resend initialized with API key:", process.env.RESEND_API_KEY);
         
         const result = await resend.emails.send({
-          from: "Marketplace <onboarding@resend.dev>",
+          from: "Hexonest <no-reply@hexonest.com.ng>",
           to,
-      subject,
-      html,
-    });
+          subject,
+          html,
+        });
 
     // Log email
 
