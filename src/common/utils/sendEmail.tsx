@@ -69,7 +69,7 @@ export async function sendEmail({ to, type, data }: EmailOptions) {
         console.log("Resend initialized with API key:", process.env.RESEND_API_KEY);
         
         const result = await resend.emails.send({
-          from: "Hexonest <no-reply@hexonest.com.ng>",
+          from: "Hexonest <info@hexonest.com.ng>",
           to,
           subject,
           html,
