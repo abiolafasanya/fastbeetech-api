@@ -73,6 +73,10 @@ export const authorize =
     const role = req.user?.role;
     if (!role) return res.status(401).json({ message: "Unauthorized" });
 
+    if(role === "super-admin") {
+      return next(); // super-admin bypasses role checks
+    }
+
     if (!allowedRoles.includes(role)) {
       return res.status(403).json({ message: "Forbidden: insufficient role" });
     }
