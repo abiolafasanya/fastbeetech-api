@@ -1,4 +1,4 @@
-# FastBeeTech Server
+# Hexonest Server
 
 This is the **server** (backend) application for the FastBeeTech project. It is built with Node.js, TypeScript, and Express, providing RESTful APIs and backend services for the platform.
 
